@@ -1,3 +1,35 @@
 spring:
   application:
     name: icar-api
+---
+spring:
+  config:
+    activate:
+      on-profile: dev
+
+  datasource:
+    url: ${LOCAL_URL_DB}
+    username: ${LOCAL_USERNAME_DB}
+    password: ${LOCAL_PASSWORD_DB}
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: true
+    open-in-view: false
+
+---
+spring:
+  config:
+    activate:
+      on-profile: prod
+  datasource:
+    url: ${PROD_URL_DB}
+    username: ${PROD_USERNAME_DB}
+    password: ${PROD_PASSWORD_DB}
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+    open-in-view: false
