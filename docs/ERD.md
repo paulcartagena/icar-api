@@ -1,12 +1,12 @@
 # ICAR API — ERD
 
-Modelo de datos inicial por módulo. Ver [Notas](./Notas.md) para decisiones de diseño y contexto. Este es un punto
-de partida — ajusta campos/relaciones a medida que lo implementes, no es definitivo.
+Initial data model by module. See [Notes](./Notes.md) for design decisions and context. This is a starting
+point — adjust fields/relationships as you implement, it's not final.
 
 ```mermaid
 %%{init: {'theme': 'base', 'themeVariables': {'primaryColor': '#eef1f5', 'primaryBorderColor': '#94a3b8', 'primaryTextColor': '#1e293b', 'lineColor': '#94a3b8', 'attributeBackgroundColorOdd': '#ffffff', 'attributeBackgroundColorEven': '#eef1f5', 'fontSize': '14px'}}}%%
 erDiagram
-    %% --- Cluster financiero (todas conectadas entre sí) ---
+    %% --- Financial cluster (all interconnected) ---
     USER {
         uuid id PK
         string username
@@ -67,7 +67,7 @@ erDiagram
         uuid created_by FK
     }
 
-    %% --- Cluster de membresía (conectadas entre sí) ---
+    %% --- Membership cluster (interconnected) ---
     MEMBER {
         uuid id PK
         string first_name
@@ -99,7 +99,7 @@ erDiagram
         time start_time
     }
 
-    %% --- Cluster de eventos (conectadas entre sí) ---
+    %% --- Events cluster (interconnected) ---
     EVENT {
         uuid id PK
         string title
@@ -117,7 +117,7 @@ erDiagram
         int display_order
     }
 
-    %% --- Sin relaciones: contenido singleton del sitio público ---
+    %% --- No relations: public site singleton content ---
     ABOUT_US {
         uuid id PK
         string title
@@ -133,16 +133,16 @@ erDiagram
         string map_url
     }
 
-    DONATION ||--o| INCOME : "genera al completarse"
-    CATEGORY ||--o{ INCOME : "clasifica"
-    CATEGORY ||--o{ EXPENSE : "clasifica"
-    CATEGORY ||--o{ BUDGET : "clasifica"
-    USER ||--o{ INCOME : "registra"
-    USER ||--o{ EXPENSE : "registra"
-    USER ||--o{ BUDGET : "crea"
-    FAMILY ||--o{ MEMBER : "tiene"
-    MEMBER ||--o{ FAMILY : "es responsable de"
-    MEMBER }o--o{ MINISTRY : "participa en"
-    MINISTRY ||--o{ SERVICE_SCHEDULE : "organiza"
-    EVENT ||--o{ EVENT_PHOTO : "tiene"
+    DONATION ||--o| INCOME : "generates on completion"
+    CATEGORY ||--o{ INCOME : "classifies"
+    CATEGORY ||--o{ EXPENSE : "classifies"
+    CATEGORY ||--o{ BUDGET : "classifies"
+    USER ||--o{ INCOME : "registers"
+    USER ||--o{ EXPENSE : "registers"
+    USER ||--o{ BUDGET : "creates"
+    FAMILY ||--o{ MEMBER : "has"
+    MEMBER ||--o{ FAMILY : "is responsible for"
+    MEMBER }o--o{ MINISTRY : "participates in"
+    MINISTRY ||--o{ SERVICE_SCHEDULE : "organizes"
+    EVENT ||--o{ EVENT_PHOTO : "has"
 ```
