@@ -12,7 +12,7 @@ erDiagram
         string username
         string password_hash
         string full_name
-        enum role "ADMIN | TESORERO"
+        enum role "ADMIN | TREASURER"
         boolean enabled
     }
 
