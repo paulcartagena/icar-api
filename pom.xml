@@ -56,11 +56,12 @@
             <scope>runtime</scope>
         </dependency>
 
-        <!-- Flyway: DB schema migrations (SQL files in db/migration). Postgres support is a separate
-             module since Flyway v10. -->
+        <!-- Flyway: DB schema migrations (SQL files in db/migration). Spring Boot 4's modular
+             autoconfiguration requires the starter (plain flyway-core is not auto-run). Postgres
+             support is a separate module since Flyway v10. -->
         <dependency>
-            <groupId>org.flywaydb</groupId>
-            <artifactId>flyway-core</artifactId>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-flyway</artifactId>
         </dependency>
         <dependency>
             <groupId>org.flywaydb</groupId>

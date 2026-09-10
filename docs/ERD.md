@@ -12,7 +12,7 @@ erDiagram
         string username
         string password_hash
         string full_name
-        enum role "ADMIN | TESORERO"
+        enum role "ADMIN | TREASURER"
         boolean enabled
     }
 
@@ -92,6 +92,13 @@ erDiagram
         string description
     }
 
+    SERVICE_SCHEDULE {
+        uuid id PK
+        uuid ministry_id FK
+        string day_of_week
+        time start_time
+    }
+
     %% --- Cluster de eventos (conectadas entre sí) ---
     EVENT {
         uuid id PK
@@ -107,7 +114,6 @@ erDiagram
         uuid id PK
         uuid event_id FK
         string image_url
-        string caption
         int display_order
     }
 
@@ -117,13 +123,6 @@ erDiagram
         string title
         text body
         string image_url
-    }
-
-    SERVICE_SCHEDULE {
-        uuid id PK
-        string day_of_week
-        time start_time
-        string description
     }
 
     CONTACT_INFO {
@@ -144,5 +143,6 @@ erDiagram
     FAMILY ||--o{ MEMBER : "tiene"
     MEMBER ||--o{ FAMILY : "es responsable de"
     MEMBER }o--o{ MINISTRY : "participa en"
+    MINISTRY ||--o{ SERVICE_SCHEDULE : "organiza"
     EVENT ||--o{ EVENT_PHOTO : "tiene"
 ```
