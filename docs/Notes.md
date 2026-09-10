@@ -1,57 +1,56 @@
 # ICAR API — Notes
 
-Decisiones de diseño y contexto que no cabe directamente en los diagramas. Ver [ERD](./ERD.md) para el modelo de
-datos.
+Design decisions and context that don't fit directly in the diagrams. See [ERD](./ERD.md) for the data model.
 
 ## Donation
-No tiene relación con `Member` a propósito: donar es una acción pública abierta a cualquiera que entre al sitio,
-no requiere ser miembro. El donante solo escribe su nombre (`donor_name`) y opcionalmente un mensaje (`message`);
-`payer_email` no es un campo del formulario — se completa solo cuando el método es PAYPAL, tomado de la respuesta
-de captura de PayPal.
+Deliberately has no relation to `Member`: donating is a public action open to anyone who visits the site, it
+doesn't require being a member. The donor only enters their name (`donor_name`) and optionally a message
+(`message`); `payer_email` isn't a form field — it's only filled in when the method is PAYPAL, taken from the
+PayPal capture response.
 
 ## Member.status
-Cubre el ciclo de vida de un miembro de la congregación: visitante, nuevo, en proceso de adoctrinamiento, activo,
-inactivo, o fallecido (`VISITOR | NEW | IN_DISCIPLESHIP | ACTIVE | INACTIVE | DECEASED`). Es deliberadamente un
-módulo aparte de donaciones.
+Covers a congregation member's lifecycle: visitor, new, in discipleship, active, inactive, or deceased
+(`VISITOR | NEW | IN_DISCIPLESHIP | ACTIVE | INACTIVE | DECEASED`). It's deliberately a separate module from
+donations.
 
 ## Member ↔ Family
-`Member.family_id` (a qué familia pertenece) y `Family.responsible_member_id` (quién es el responsable de esa
-familia) son dos relaciones separadas hacia el mismo par de tablas — no es una referencia circular problemática,
-solo hay que crear el `Member` responsable antes de (o al mismo tiempo que) asignarlo como responsable de su
-`Family`.
+`Member.family_id` (which family they belong to) and `Family.responsible_member_id` (who's responsible for that
+family) are two separate relationships toward the same pair of tables — it's not a problematic circular
+reference, you just need to create the responsible `Member` before (or at the same time as) assigning them as
+responsible for their `Family`.
 
 ## Member ↔ Ministry
-Muchos-a-muchos (un miembro puede estar en 0, 1 o varios ministerios) — se implementa con una tabla intermedia
-`member_ministry(member_id, ministry_id)`, aunque el diagrama la muestre como relación directa.
+Many-to-many (a member can be in 0, 1, or several ministries) — implemented with a join table
+`member_ministry(member_id, ministry_id)`, even though the diagram shows it as a direct relationship.
 
 ## Income
-- `source_donation_id` es opcional — null si el ingreso fue registrado manualmente (no viene de una donación).
-- `registered_by` es opcional — solo tiene valor cuando un usuario (ej. el tesorero) registra el ingreso a mano;
-  cuando el ingreso se genera automáticamente porque una donación se completó, no lo registró ninguna persona,
-  así que queda null.
+- `source_donation_id` is optional — null if the income was registered manually (not from a donation).
+- `registered_by` is optional — it only has a value when a user (e.g. the treasurer) registers the income by
+  hand; when the income is generated automatically because a donation completed, no one registered it, so it
+  stays null.
 
-**¿Por qué `Income` tiene `registered_by` si viene de una `Donation`?**
-No siempre viene de una donación. `Income` representa *cualquier* ingreso de dinero a la iglesia, y hay dos formas
-de que exista uno:
-1. **Automático**: una `Donation` se completa (ej. el donante pagó por PayPal) → el sistema crea el `Income`
-   solo, sin que nadie lo toque. Ahí `source_donation_id` apunta a esa donación y `registered_by` queda null
-   (nadie lo "registró", lo generó el sistema).
-2. **Manual**: el tesorero recibe dinero que no pasó por el flujo de donación del sitio (ej. alguien le da
-   efectivo en mano, o hay un ingreso de otra fuente) y lo carga él mismo en el panel de admin. Ahí
-   `source_donation_id` queda null y `registered_by` apunta al usuario que lo cargó — sirve para saber quién es
-   responsable de ese registro si después hay que auditar o corregir algo.
+**Why does `Income` have `registered_by` if it comes from a `Donation`?**
+It doesn't always come from a donation. `Income` represents *any* money coming into the church, and there are
+two ways one can exist:
+1. **Automatic**: a `Donation` completes (e.g. the donor paid via PayPal) → the system creates the `Income` on
+   its own, with no one touching it. There, `source_donation_id` points to that donation and `registered_by`
+   stays null (no one "registered" it, the system generated it).
+2. **Manual**: the treasurer receives money that didn't go through the site's donation flow (e.g. someone hands
+   them cash, or there's income from another source) and enters it themselves in the admin panel. There,
+   `source_donation_id` stays null and `registered_by` points to the user who entered it — useful for knowing
+   who's responsible for that record if it ever needs to be audited or corrected.
 
 ## Budget
-Es una meta/plan de cuánto dinero se espera ingresar o gastar en una categoría durante un periodo, definida *antes*
-de que pase (ej. "Misiones: $2,000 planeados para el primer trimestre de 2026"). No es un movimiento de dinero
-real — es solo un número de referencia. Con eso, el reporte "presupuesto vs. real" suma los `Income`/`Expense`
-reales de esa categoría en ese periodo y los compara contra el `planned_amount` del `Budget`, para ver si van
-gastando/recibiendo más, menos, o justo lo planeado.
+It's a goal/plan for how much money is expected to come in or go out for a category during a period, defined
+*before* it happens (e.g. "Missions: $2,000 planned for Q1 2026"). It's not an actual money movement — it's just
+a reference number. With that, the "budget vs. actual" report sums the real `Income`/`Expense` for that category
+in that period and compares it against the `Budget`'s `planned_amount`, to see whether they're spending/receiving
+more, less, or exactly as planned.
 
-## Imágenes
-Las imágenes (`image_url` en `AboutUs`/`EventPhoto`) son URLs de S3, no binarios — el flujo de subida es aparte
-(`POST /api/admin/files/upload`), y esta API solo persiste la URL resultante.
+## Images
+Images (`image_url` in `AboutUs`/`EventPhoto`) are S3 URLs, not binaries — the upload flow is separate
+(`POST /api/admin/files/upload`), and this API only persists the resulting URL.
 
-## Registros singleton
-`AboutUs` y `ContactInfo` son registros "singleton" en la práctica (siempre existe 1 fila), aunque estén modelados
-como tabla normal.
+## Singleton records
+`AboutUs` and `ContactInfo` are "singleton" records in practice (there's always exactly 1 row), even though
+they're modeled as a normal table.
