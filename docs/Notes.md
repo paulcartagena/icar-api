@@ -1,4 +1,4 @@
-# ICAR API — Notas
+# ICAR API — Notes
 
 Decisiones de diseño y contexto que no cabe directamente en los diagramas. Ver [ERD](./ERD.md) para el modelo de
 datos.
