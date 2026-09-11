@@ -13,7 +13,7 @@ erDiagram
         string password_hash
         string full_name
         enum role "ADMIN | TREASURER"
-        boolean enabled
+        enum status "ACTIVE | INACTIVE | REVOKED"
     }
 
     DONATION {
