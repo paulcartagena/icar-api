@@ -17,7 +17,6 @@ import java.util.UUID;
 @NoArgsConstructor
 @Embeddable
 public class MemberMinistryId implements Serializable {
-
     private UUID memberId;
     private UUID ministryId;
 }
