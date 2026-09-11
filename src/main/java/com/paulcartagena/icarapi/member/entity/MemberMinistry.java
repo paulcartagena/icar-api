@@ -16,7 +16,6 @@ import java.time.LocalDateTime;
 @Entity
 @Table(name = "member_ministry")
 public class MemberMinistry {
-
     @EmbeddedId
     private MemberMinistryId id = new MemberMinistryId();
 
