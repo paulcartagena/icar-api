@@ -20,8 +20,9 @@ reference, you just need to create the responsible `Member` before (or at the sa
 responsible for their `Family`.
 
 ## Member ↔ Ministry
-Many-to-many (a member can be in 0, 1, or several ministries) — implemented with a join table
-`member_ministry(member_id, ministry_id)`, even though the diagram shows it as a direct relationship.
+Many-to-many (a member can be in 0, 1, or several ministries), tracked via `member_ministry(member_id,
+ministry_id, joined_at)`. Because it carries `joined_at`, it's not a plain join table — it needs its own JPA
+entity with a composite key (`member_id` + `ministry_id`), not a bare `@ManyToMany`/`@JoinTable`.
 
 ## Income
 - `source_donation_id` is optional — null if the income was registered manually (not from a donation).

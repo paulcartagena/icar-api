@@ -86,6 +86,12 @@ erDiagram
         uuid responsible_member_id FK
     }
 
+    MEMBER_MINISTRY {
+        uuid member_id PK, FK
+        uuid ministry_id PK, FK
+        datetime joined_at
+    }
+
     MINISTRY {
         uuid id PK
         string name
@@ -142,7 +148,8 @@ erDiagram
     USER ||--o{ BUDGET : "creates"
     FAMILY ||--o{ MEMBER : "has"
     MEMBER ||--o{ FAMILY : "is responsible for"
-    MEMBER }o--o{ MINISTRY : "participates in"
+    MEMBER ||--o{ MEMBER_MINISTRY : "participates in"
+    MINISTRY ||--o{ MEMBER_MINISTRY : "has member"
     MINISTRY ||--o{ SERVICE_SCHEDULE : "organizes"
     EVENT ||--o{ EVENT_PHOTO : "has"
 ```
