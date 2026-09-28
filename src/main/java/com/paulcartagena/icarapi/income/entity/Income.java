@@ -43,6 +43,6 @@ public class Income {
     private LocalDate date;
 
     @ManyToOne
-    @JoinColumn(name = "registered_by", nullable = false)
+    @JoinColumn(name = "registered_by")
     private AppUser registeredBy;
 }

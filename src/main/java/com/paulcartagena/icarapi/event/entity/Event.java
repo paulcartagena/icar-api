@@ -28,11 +28,11 @@ public class Event {
     @Column(nullable = false)
     private String description;
 
-    @Column(name = "start_datetime", nullable = false)
-    private LocalDateTime startDatetime;
+    @Column(name = "start_at", nullable = false)
+    private LocalDateTime startAt;
 
-    @Column(name = "end_datetime", nullable = false)
-    private LocalDateTime endDatetime;
+    @Column(name = "end_at", nullable = false)
+    private LocalDateTime endAt;
 
     @Column(length = 100, nullable = true)
     private String location;
