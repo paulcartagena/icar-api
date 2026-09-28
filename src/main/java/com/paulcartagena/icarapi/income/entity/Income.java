@@ -1,6 +1,7 @@
 package com.paulcartagena.icarapi.income.entity;
 
 import com.paulcartagena.icarapi.category.entity.Category;
+import com.paulcartagena.icarapi.donation.entity.Donation;
 import com.paulcartagena.icarapi.user.entity.AppUser;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
@@ -27,6 +28,10 @@ public class Income {
     @ManyToOne
     @JoinColumn(name = "category_id", nullable = false)
     private Category category;
+
+    @OneToOne
+    @JoinColumn(name = "source_donation_id")
+    private Donation sourceDonation;
 
     @Column(precision = 10, scale = 2, nullable = false)
     private BigDecimal amount;
