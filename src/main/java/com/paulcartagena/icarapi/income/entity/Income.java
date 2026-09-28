@@ -30,7 +30,7 @@ public class Income {
     private Category category;
 
     @OneToOne
-    @JoinColumn(name = "source_donation_id")
+    @JoinColumn(name = "source_donation_id", unique = true)
     private Donation sourceDonation;
 
     @Column(precision = 10, scale = 2, nullable = false)
