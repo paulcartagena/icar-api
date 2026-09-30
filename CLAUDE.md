@@ -9,7 +9,7 @@ membership, site content) plus public read endpoints for a companion public webs
 JPA entities exist for the financial cluster (`AppUser`, `Category`, `Donation`, `Income`, `Expense`, `Budget`),
 membership cluster (`Member`, `Family`, `Ministry`, `ServiceSchedule`, `MemberMinistry`), events
 (`Event`, `EventPhoto`), and site content (`AboutUs`, `ContactInfo`), backed by Flyway migrations in
-`src/main/resources/db/migration` (`V1`-`V4`) and a Postgres datasource configured per-profile (`dev`/`prod`) in
+`src/main/resources/db/migration` (`V1`-`V5`) and a Postgres datasource configured per-profile (`dev`/`prod`) in
 `application.yaml` via env vars (`hibernate.ddl-auto: validate`, so entities and migrations must stay in sync).
 There is still no Spring Security config and no controllers/services layer yet. Do not assume any
 controllers/services exist beyond what's actually in `src/`; the ERD lives in the Obsidian vault, not this repo.
