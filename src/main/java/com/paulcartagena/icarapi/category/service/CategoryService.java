@@ -2,8 +2,10 @@ package com.paulcartagena.icarapi.category.service;
 
 import com.paulcartagena.icarapi.category.dto.CategoryRequest;
 import com.paulcartagena.icarapi.category.dto.CategoryResponse;
+import com.paulcartagena.icarapi.category.dto.CategoryUpdateRequest;
 import com.paulcartagena.icarapi.category.entity.Category;
 import com.paulcartagena.icarapi.category.repository.CategoryRepository;
+import com.paulcartagena.icarapi.exception.ApiException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -22,37 +24,63 @@ public class CategoryService {
 
     @Transactional(readOnly = true)
     public List<CategoryResponse> getAllCategories() {
-        return categoryRepository.findAll()
+        return categoryRepository
+                .findAll()
                 .stream()
                 .map(this::buildResponse)
                 .toList();
     }
 
     public CategoryResponse createCategory(CategoryRequest categoryRequest) {
-        // Validation: unique
-        if (categoryRepository.existsByNameAndType(categoryRequest.getName(), categoryRequest.getType())) {
-            throw new RuntimeException();
+        String name = categoryRequest.name().trim();
+
+        // Validation: unique (case-insensitive)
+        if (categoryRepository.existsByNameIgnoreCaseAndType(name, categoryRequest.type())) {
+            throw ApiException.duplicateResource("Category already exists.");
         }
 
         Category category = new Category();
-        category.setName(categoryRequest.getName());
-        category.setType(categoryRequest.getType());
+        category.setName(name);
+        category.setType(categoryRequest.type());
         category.setActive(true);
 
         Category savedCategory = categoryRepository.save(category);
         return buildResponse(savedCategory);
     }
 
-    public CategoryResponse updateCategory(UUID id, CategoryRequest categoryRequest) {
+    public CategoryResponse updateCategory(UUID id, CategoryUpdateRequest categoryUpdateRequest) {
 
         Category category = categoryRepository.findById(id)
-                .orElseThrow();
+                .orElseThrow(() -> ApiException.resourceNotFound("Category not found: " + id));
 
-        category.setName(categoryRequest.getName());
-        category.setType(categoryRequest.getType());
+        String name = categoryUpdateRequest.name().trim();
+
+        // Validation: unique (case-insensitive), excluding the category itself
+        if (categoryRepository.existsByNameIgnoreCaseAndTypeAndIdNot(name, category.getType(), id)) {
+            throw ApiException.duplicateResource("Category already exists.");
+        }
+
+        category.setName(name);
 
         Category updatedCategory = categoryRepository.save(category);
         return buildResponse(updatedCategory);
+    }
+
+    public CategoryResponse activateCategory(UUID id) {
+        return changeActive(id, true);
+    }
+
+    public CategoryResponse deactivateCategory(UUID id) {
+        return changeActive(id, false);
+    }
+
+    // Idempotent: setting the current value again is a no-op
+    private CategoryResponse changeActive(UUID id, boolean active) {
+        Category category = categoryRepository.findById(id)
+                .orElseThrow(() -> ApiException.resourceNotFound("Category not found: " + id));
+
+        category.setActive(active);
+        return buildResponse(category);
     }
 
     private CategoryResponse buildResponse(Category category) {
