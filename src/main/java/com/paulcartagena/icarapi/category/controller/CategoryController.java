@@ -3,6 +3,7 @@ package com.paulcartagena.icarapi.category.controller;
 import com.paulcartagena.icarapi.category.dto.CategoryRequest;
 import com.paulcartagena.icarapi.category.dto.CategoryResponse;
 import com.paulcartagena.icarapi.category.dto.CategoryUpdateRequest;
+import com.paulcartagena.icarapi.category.enums.CategoryType;
 import com.paulcartagena.icarapi.category.service.CategoryService;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -24,8 +25,9 @@ public class CategoryController {
     }
 
     @GetMapping
-    public List<CategoryResponse> getAllCategories() {
-        return categoryService.getAllCategories();
+    public List<CategoryResponse> getAllCategories(@RequestParam(required = false) CategoryType type,
+                                                   @RequestParam(required = false) Boolean active) {
+        return categoryService.getAllCategories(type, active);
     }
 
     @PostMapping

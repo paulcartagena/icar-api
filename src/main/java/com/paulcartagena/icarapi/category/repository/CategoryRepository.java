@@ -9,8 +9,10 @@ import java.util.UUID;
 
 public interface CategoryRepository extends JpaRepository<Category, UUID> {
 
-    // Filter by category type
+    // Filters
     List<Category> findByType(CategoryType type);
+    List<Category> findByActive(boolean active);
+    List<Category> findByTypeAndActive(CategoryType type, boolean active);
 
     // Used to create non-duplicated categories
     boolean existsByNameIgnoreCaseAndType(String name, CategoryType type);
