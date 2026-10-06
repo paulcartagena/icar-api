@@ -4,6 +4,7 @@ import com.paulcartagena.icarapi.category.dto.CategoryRequest;
 import com.paulcartagena.icarapi.category.dto.CategoryResponse;
 import com.paulcartagena.icarapi.category.dto.CategoryUpdateRequest;
 import com.paulcartagena.icarapi.category.entity.Category;
+import com.paulcartagena.icarapi.category.enums.CategoryType;
 import com.paulcartagena.icarapi.category.repository.CategoryRepository;
 import com.paulcartagena.icarapi.exception.ApiException;
 import org.springframework.stereotype.Service;
@@ -23,10 +24,21 @@ public class CategoryService {
     }
 
     @Transactional(readOnly = true)
-    public List<CategoryResponse> getAllCategories() {
-        return categoryRepository
-                .findAll()
-                .stream()
+    public List<CategoryResponse> getAllCategories(CategoryType type, Boolean active) {
+        List<Category> categories;
+
+        // Both filters are optional: null means "don't filter by it"
+        if (type == null && active == null) {
+            categories = categoryRepository.findAll();
+        } else if (type != null && active == null) {
+            categories = categoryRepository.findByType(type);
+        } else if (type == null) {
+            categories = categoryRepository.findByActive(active);
+        } else {
+            categories = categoryRepository.findByTypeAndActive(type, active);
+        }
+
+        return categories.stream()
                 .map(this::buildResponse)
                 .toList();
     }
@@ -61,9 +73,7 @@ public class CategoryService {
         }
 
         category.setName(name);
-
-        Category updatedCategory = categoryRepository.save(category);
-        return buildResponse(updatedCategory);
+        return buildResponse(category);
     }
 
     public CategoryResponse activateCategory(UUID id) {
