@@ -1,11 +1,12 @@
 package com.paulcartagena.icarapi.expense.controller;
 
+import com.paulcartagena.icarapi.expense.dto.ExpenseRequest;
 import com.paulcartagena.icarapi.expense.dto.ExpenseResponse;
 import com.paulcartagena.icarapi.expense.service.ExpenseService;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import jakarta.validation.Valid;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
@@ -23,5 +24,11 @@ public class ExpenseController {
     @GetMapping
     public List<ExpenseResponse> getAllExpenses() {
         return expenseService.getAllExpenses();
+    }
+
+    @PostMapping
+    @ResponseStatus(HttpStatus.CREATED)
+    public ExpenseResponse createExpense(@Valid @RequestBody ExpenseRequest expenseRequest) {
+        return expenseService.createExpense(expenseRequest);
     }
 }
