@@ -20,4 +20,8 @@ public class ApiException extends RuntimeException {
     public static ApiException duplicateResource(String message) {
         return new ApiException(message, HttpStatus.CONFLICT);
     }
+
+    public static ApiException badRequest(String message) {
+        return new ApiException(message, HttpStatus.BAD_REQUEST);
+    }
 }
