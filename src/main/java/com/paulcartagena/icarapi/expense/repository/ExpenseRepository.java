@@ -12,4 +12,5 @@ public interface ExpenseRepository extends JpaRepository<Expense, UUID> {
 
     List<Expense> findByDateBetween(LocalDate from, LocalDate to, Sort sort);
     List<Expense> findByCategoryId(UUID categoryId, Sort sort);
+    List<Expense> findByCategoryIdAndDateBetween(UUID categoryId, LocalDate from, LocalDate to, Sort sort);
 }
