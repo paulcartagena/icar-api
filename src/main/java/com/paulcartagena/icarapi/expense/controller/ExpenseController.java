@@ -5,10 +5,13 @@ import com.paulcartagena.icarapi.expense.dto.ExpenseResponse;
 import com.paulcartagena.icarapi.expense.service.ExpenseService;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDate;
 import java.util.List;
+import java.util.UUID;
 
 @RestController
 @RequestMapping("/expenses")
@@ -22,13 +25,25 @@ public class ExpenseController {
     }
 
     @GetMapping
-    public List<ExpenseResponse> getAllExpenses() {
-        return expenseService.getAllExpenses();
+    public List<ExpenseResponse> getAllExpenses(@RequestParam(required = false) UUID categoryId,
+                                                @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+                                                @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
+        return expenseService.getAllExpenses(categoryId, from, to);
+    }
+
+    @GetMapping("/{id}")
+    public ExpenseResponse getExpenseById(@PathVariable UUID id) {
+        return expenseService.getExpenseById(id);
     }
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public ExpenseResponse createExpense(@Valid @RequestBody ExpenseRequest expenseRequest) {
         return expenseService.createExpense(expenseRequest);
+    }
+
+    @PutMapping("/{id}")
+    public ExpenseResponse updateExpense(@PathVariable UUID id, @Valid @RequestBody ExpenseRequest expenseRequest) {
+        return expenseService.updateExpense(id, expenseRequest);
     }
 }

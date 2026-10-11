@@ -11,8 +11,9 @@ membership cluster (`Member`, `Family`, `Ministry`, `ServiceSchedule`, `MemberMi
 (`Event`, `EventPhoto`), and site content (`AboutUs`, `ContactInfo`), backed by Flyway migrations in
 `src/main/resources/db/migration` (`V1`-`V7`) and a Postgres datasource configured per-profile (`dev`/`prod`) in
 `application.yaml` via env vars (`hibernate.ddl-auto: validate`, so entities and migrations must stay in sync).
-Every entity has a Spring Data repository. The only module with a controller/service layer so far is `category`
-(list, create, update name, activate/deactivate); the rest are entities + repositories only. There is still no
+Every entity has a Spring Data repository. The modules with a controller/service layer so far are `category`
+(list, create, update name, activate/deactivate) and `expense` (list with optional `categoryId` and `from`/`to`
+date-range filters, get by id, create, update); the rest are entities + repositories only. There is still no
 Spring Security config. Do not assume any controllers/services exist beyond what's actually in `src/`; the ERD
 lives in the Obsidian vault, not this repo.
 
@@ -27,7 +28,8 @@ lives in the Obsidian vault, not this repo.
 - Category rules: `type` is immutable after creation; name uniqueness is case-insensitive per type (enforced in
   the service with `...IgnoreCase...` queries and in the DB by the `V7` unique index on `lower(name), type`);
   names are trimmed; categories are deactivated, never deleted. Income/expense modules must reject inactive
-  categories.
+  categories when assigning one (create, or an update that changes the category); a record keeping its current
+  category can still be updated even if that category was deactivated.
 - Never edit an already-applied Flyway migration; add a new `V<n>` file instead.
 
 ## Build, run, test
