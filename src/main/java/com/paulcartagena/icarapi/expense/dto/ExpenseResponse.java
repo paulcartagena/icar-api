@@ -2,6 +2,7 @@ package com.paulcartagena.icarapi.expense.dto;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.UUID;
 
 public record ExpenseResponse(
@@ -11,6 +12,9 @@ public record ExpenseResponse(
         BigDecimal amount,
         String description,
         LocalDate date,
-        String receiptUrl
+        String receiptUrl,
+        boolean voided,
+        LocalDateTime voidedAt,
+        String voidReason
 ) {
 }

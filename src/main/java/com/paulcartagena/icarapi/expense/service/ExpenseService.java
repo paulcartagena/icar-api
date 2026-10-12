@@ -6,6 +6,7 @@ import com.paulcartagena.icarapi.category.repository.CategoryRepository;
 import com.paulcartagena.icarapi.exception.ApiException;
 import com.paulcartagena.icarapi.expense.dto.ExpenseRequest;
 import com.paulcartagena.icarapi.expense.dto.ExpenseResponse;
+import com.paulcartagena.icarapi.expense.dto.ExpenseVoidRequest;
 import com.paulcartagena.icarapi.expense.entity.Expense;
 import com.paulcartagena.icarapi.expense.repository.ExpenseRepository;
 import org.springframework.data.domain.Sort;
@@ -13,6 +14,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 
@@ -84,6 +86,10 @@ public class ExpenseService {
         Expense expense = expenseRepository.findById(id)
                 .orElseThrow(() -> ApiException.resourceNotFound("Expense not found: " + id));
 
+        if (expense.isVoided()) {
+            throw ApiException.conflict("Voided expense cannot be updated.");
+        }
+
         // Only re-validate when the category changes, so expenses whose category
         // was later deactivated can still be corrected
         if (!expense.getCategory().getId().equals(expenseRequest.categoryId())) {
@@ -94,6 +100,22 @@ public class ExpenseService {
         expense.setDescription(normalize(expenseRequest.description()));
         expense.setDate(expenseRequest.date());
         expense.setReceiptUrl(normalize(expenseRequest.receiptUrl()));
+
+        return buildResponse(expense);
+    }
+
+    public ExpenseResponse voidExpense(UUID id, ExpenseVoidRequest expenseVoidRequest) {
+        Expense expense = expenseRepository.findById(id)
+                .orElseThrow(() -> ApiException.resourceNotFound("Expense not found: " + id));
+
+        // Voiding is final: it cannot be repeated or reverted
+        if (expense.isVoided()) {
+            throw ApiException.conflict("Expense is already voided.");
+        }
+
+        expense.setVoided(true);
+        expense.setVoidedAt(LocalDateTime.now());
+        expense.setVoidReason(expenseVoidRequest.reason().trim());
 
         return buildResponse(expense);
     }
@@ -126,7 +148,10 @@ public class ExpenseService {
                 expense.getAmount(),
                 expense.getDescription(),
                 expense.getDate(),
-                expense.getReceiptUrl()
+                expense.getReceiptUrl(),
+                expense.isVoided(),
+                expense.getVoidedAt(),
+                expense.getVoidReason()
         );
     }
 }
