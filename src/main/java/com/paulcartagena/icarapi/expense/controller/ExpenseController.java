@@ -2,6 +2,7 @@ package com.paulcartagena.icarapi.expense.controller;
 
 import com.paulcartagena.icarapi.expense.dto.ExpenseRequest;
 import com.paulcartagena.icarapi.expense.dto.ExpenseResponse;
+import com.paulcartagena.icarapi.expense.dto.ExpenseVoidRequest;
 import com.paulcartagena.icarapi.expense.service.ExpenseService;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -45,5 +46,11 @@ public class ExpenseController {
     @PutMapping("/{id}")
     public ExpenseResponse updateExpense(@PathVariable UUID id, @Valid @RequestBody ExpenseRequest expenseRequest) {
         return expenseService.updateExpense(id, expenseRequest);
+    }
+
+    @PatchMapping("/{id}/void")
+    public ExpenseResponse voidExpense(@PathVariable UUID id,
+                                       @Valid @RequestBody ExpenseVoidRequest expenseVoidRequest) {
+        return expenseService.voidExpense(id, expenseVoidRequest);
     }
 }
