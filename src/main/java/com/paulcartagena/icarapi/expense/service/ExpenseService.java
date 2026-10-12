@@ -62,10 +62,7 @@ public class ExpenseService {
 
     @Transactional(readOnly = true)
     public ExpenseResponse getExpenseById(UUID id) {
-        Expense expense = expenseRepository.findById(id)
-                .orElseThrow(() -> ApiException.resourceNotFound("Expense not found: " + id));
-
-        return buildResponse(expense);
+        return buildResponse(findExpense(id));
     }
 
     public ExpenseResponse createExpense(ExpenseRequest expenseRequest) {
@@ -83,8 +80,7 @@ public class ExpenseService {
     }
 
     public ExpenseResponse updateExpense(UUID id, ExpenseRequest expenseRequest) {
-        Expense expense = expenseRepository.findById(id)
-                .orElseThrow(() -> ApiException.resourceNotFound("Expense not found: " + id));
+        Expense expense = findExpense(id);
 
         if (expense.isVoided()) {
             throw ApiException.conflict("Voided expense cannot be updated.");
@@ -105,8 +101,7 @@ public class ExpenseService {
     }
 
     public ExpenseResponse voidExpense(UUID id, ExpenseVoidRequest expenseVoidRequest) {
-        Expense expense = expenseRepository.findById(id)
-                .orElseThrow(() -> ApiException.resourceNotFound("Expense not found: " + id));
+        Expense expense = findExpense(id);
 
         // Voiding is final: it cannot be repeated or reverted
         if (expense.isVoided()) {
@@ -118,6 +113,11 @@ public class ExpenseService {
         expense.setVoidReason(expenseVoidRequest.reason().trim());
 
         return buildResponse(expense);
+    }
+
+    private Expense findExpense(UUID id) {
+        return expenseRepository.findById(id)
+                .orElseThrow(() -> ApiException.resourceNotFound("Expense not found: " + id));
     }
 
     // Validation: should be expense category
