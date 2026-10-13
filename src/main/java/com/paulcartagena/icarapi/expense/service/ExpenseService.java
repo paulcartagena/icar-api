@@ -4,15 +4,14 @@ import com.paulcartagena.icarapi.category.entity.Category;
 import com.paulcartagena.icarapi.category.enums.CategoryType;
 import com.paulcartagena.icarapi.category.repository.CategoryRepository;
 import com.paulcartagena.icarapi.exception.ApiException;
-import com.paulcartagena.icarapi.expense.dto.ExpenseRequest;
-import com.paulcartagena.icarapi.expense.dto.ExpenseResponse;
-import com.paulcartagena.icarapi.expense.dto.ExpenseVoidRequest;
+import com.paulcartagena.icarapi.expense.dto.*;
 import com.paulcartagena.icarapi.expense.entity.Expense;
 import com.paulcartagena.icarapi.expense.repository.ExpenseRepository;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -113,6 +112,25 @@ public class ExpenseService {
         expense.setVoidReason(expenseVoidRequest.reason().trim());
 
         return buildResponse(expense);
+    }
+
+    @Transactional(readOnly = true)
+    public ExpenseSummaryResponse getSummary(LocalDate from, LocalDate to) {
+        if (from.isAfter(to)) {
+            throw ApiException.badRequest("'from' must be before or equal to 'to'.");
+        }
+
+        List<ExpenseCategoryTotal> byCategory = expenseRepository.sumByCategory(from, to);
+
+        BigDecimal total = byCategory.stream()
+                .map(ExpenseCategoryTotal::total)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        long count = byCategory.stream()
+                .mapToLong(ExpenseCategoryTotal::count)
+                .sum();
+
+        return new ExpenseSummaryResponse(from, to, total, count, byCategory);
     }
 
     private Expense findExpense(UUID id) {
