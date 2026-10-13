@@ -2,6 +2,7 @@ package com.paulcartagena.icarapi.expense.controller;
 
 import com.paulcartagena.icarapi.expense.dto.ExpenseRequest;
 import com.paulcartagena.icarapi.expense.dto.ExpenseResponse;
+import com.paulcartagena.icarapi.expense.dto.ExpenseSummaryResponse;
 import com.paulcartagena.icarapi.expense.dto.ExpenseVoidRequest;
 import com.paulcartagena.icarapi.expense.service.ExpenseService;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -52,5 +53,11 @@ public class ExpenseController {
     public ExpenseResponse voidExpense(@PathVariable UUID id,
                                        @Valid @RequestBody ExpenseVoidRequest expenseVoidRequest) {
         return expenseService.voidExpense(id, expenseVoidRequest);
+    }
+
+    @GetMapping("/summary")
+    public ExpenseSummaryResponse getSummary(@RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+                                             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
+        return expenseService.getSummary(from, to);
     }
 }
