@@ -8,6 +8,7 @@ import com.paulcartagena.icarapi.expense.dto.*;
 import com.paulcartagena.icarapi.expense.entity.Expense;
 import com.paulcartagena.icarapi.expense.repository.ExpenseRepository;
 import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -16,6 +17,9 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
+
+import static com.paulcartagena.icarapi.expense.repository.ExpenseSpecifications.dateBetween;
+import static com.paulcartagena.icarapi.expense.repository.ExpenseSpecifications.hasCategory;
 
 @Service
 @Transactional
@@ -43,18 +47,16 @@ public class ExpenseService {
             throw ApiException.badRequest("'from' must be before or equal to 'to'.");
         }
 
-        List<Expense> expenses;
-        if (categoryId == null && from == null) {
-            expenses = expenseRepository.findAll(sort);
-        } else if (categoryId == null) {
-            expenses = expenseRepository.findByDateBetween(from, to, sort);
-        } else if (from == null) {
-            expenses = expenseRepository.findByCategoryId(categoryId, sort);
-        } else {
-            expenses = expenseRepository.findByCategoryIdAndDateBetween(categoryId, from, to, sort);
+        // Start unrestricted (all expenses) and add only the filters that were sent
+        Specification<Expense> spec = Specification.unrestricted();
+        if (categoryId != null) {
+            spec = spec.and(hasCategory(categoryId));
+        }
+        if (from != null) {
+            spec = spec.and(dateBetween(from, to));
         }
 
-        return expenses.stream()
+        return expenseRepository.findAll(spec, sort).stream()
                 .map(this::buildResponse)
                 .toList();
     }
