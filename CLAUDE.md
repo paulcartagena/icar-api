@@ -14,7 +14,7 @@ membership cluster (`Member`, `Family`, `Ministry`, `ServiceSchedule`, `MemberMi
 Every entity has a Spring Data repository. The modules with a controller/service layer so far are `category`
 (list, create, update name, activate/deactivate) and `expense` (list with optional `categoryId` and `from`/`to`
 date-range filters, get by id, create, update, void, and a `/summary` of totals per category for a required
-`from`/`to` period) and `income` (so far only list, with the same optional `categoryId` and `from`/`to` filters);
+`from`/`to` period) and `income` (a mirror of `expense` with the same endpoints, minus `receiptUrl`);
 the rest are entities + repositories only. There is still no
 Spring Security config. Do not assume any controllers/services exist beyond what's actually in `src/`; the ERD
 lives in the Obsidian vault, not this repo.
@@ -36,8 +36,8 @@ lives in the Obsidian vault, not this repo.
 - Expense rules: expenses are voided, never deleted. Voiding requires a reason, is final (cannot be repeated or
   reverted) and blocks updates; the `V8` `chk_expense_void` CHECK keeps `voided`, `voided_at` and `void_reason`
   consistent. Voided expenses still appear in the list but are excluded from totals.
-- Income has the same void columns (`V9`, `chk_income_void`) and is meant to follow the same void rules once
-  void/update endpoints are added.
+- Income follows the same void rules as expenses (`V9` `chk_income_void`). Income categories must be of type
+  `INCOME`. `sourceDonation` is read-only in the API (not settable via `IncomeRequest`).
 - Never edit an already-applied Flyway migration; add a new `V<n>` file instead.
 
 ## Build, run, test
