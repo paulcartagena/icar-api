@@ -11,6 +11,7 @@ import lombok.Setter;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Getter
@@ -41,6 +42,15 @@ public class Income {
 
     @Column(nullable = false)
     private LocalDate date;
+
+    @Column(nullable = false)
+    private boolean voided;
+
+    @Column(name = "voided_at")
+    private LocalDateTime voidedAt;
+
+    @Column(name = "void_reason", length = 250)
+    private String voidReason;
 
     @ManyToOne
     @JoinColumn(name = "registered_by")

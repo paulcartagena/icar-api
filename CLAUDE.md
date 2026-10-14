@@ -9,12 +9,13 @@ membership, site content) plus public read endpoints for a companion public webs
 JPA entities exist for the financial cluster (`AppUser`, `Category`, `Donation`, `Income`, `Expense`, `Budget`),
 membership cluster (`Member`, `Family`, `Ministry`, `ServiceSchedule`, `MemberMinistry`), events
 (`Event`, `EventPhoto`), and site content (`AboutUs`, `ContactInfo`), backed by Flyway migrations in
-`src/main/resources/db/migration` (`V1`-`V8`) and a Postgres datasource configured per-profile (`dev`/`prod`) in
+`src/main/resources/db/migration` (`V1`-`V9`) and a Postgres datasource configured per-profile (`dev`/`prod`) in
 `application.yaml` via env vars (`hibernate.ddl-auto: validate`, so entities and migrations must stay in sync).
 Every entity has a Spring Data repository. The modules with a controller/service layer so far are `category`
 (list, create, update name, activate/deactivate) and `expense` (list with optional `categoryId` and `from`/`to`
 date-range filters, get by id, create, update, void, and a `/summary` of totals per category for a required
-`from`/`to` period); the rest are entities + repositories only. There is still no
+`from`/`to` period) and `income` (so far only list, with the same optional `categoryId` and `from`/`to` filters);
+the rest are entities + repositories only. There is still no
 Spring Security config. Do not assume any controllers/services exist beyond what's actually in `src/`; the ERD
 lives in the Obsidian vault, not this repo.
 
@@ -35,6 +36,8 @@ lives in the Obsidian vault, not this repo.
 - Expense rules: expenses are voided, never deleted. Voiding requires a reason, is final (cannot be repeated or
   reverted) and blocks updates; the `V8` `chk_expense_void` CHECK keeps `voided`, `voided_at` and `void_reason`
   consistent. Voided expenses still appear in the list but are excluded from totals.
+- Income has the same void columns (`V9`, `chk_income_void`) and is meant to follow the same void rules once
+  void/update endpoints are added.
 - Never edit an already-applied Flyway migration; add a new `V<n>` file instead.
 
 ## Build, run, test
