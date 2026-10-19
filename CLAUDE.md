@@ -9,14 +9,14 @@ membership, site content) plus public read endpoints for a companion public webs
 JPA entities exist for the financial cluster (`AppUser`, `Category`, `Donation`, `Income`, `Expense`, `Budget`),
 membership cluster (`Member`, `Family`, `Ministry`, `ServiceSchedule`, `MemberMinistry`), events
 (`Event`, `EventPhoto`), and site content (`AboutUs`, `ContactInfo`), backed by Flyway migrations in
-`src/main/resources/db/migration` (`V1`-`V9`) and a Postgres datasource configured per-profile (`dev`/`prod`) in
+`src/main/resources/db/migration` (`V1`-`V11`) and a Postgres datasource configured per-profile (`dev`/`prod`) in
 `application.yaml` via env vars (`hibernate.ddl-auto: validate`, so entities and migrations must stay in sync).
 Every entity has a Spring Data repository. The modules with a controller/service layer so far are `category`
 (list, create, update name, activate/deactivate) and `expense` (list with optional `categoryId` and `from`/`to`
 date-range filters, get by id, create, update, void, and a `/summary` of totals per category for a required
-`from`/`to` period) and `income` (a mirror of `expense` with the same endpoints, minus `receiptUrl`);
-the rest are entities + repositories only. There is still no
-Spring Security config. Do not assume any controllers/services exist beyond what's actually in `src/`; the ERD
+`from`/`to` period) and `income` (a mirror of `expense` with the same endpoints, minus `receiptUrl`), plus
+`auth` (login, refresh, logout, me) and `user` (user management, own password change); the rest are entities +
+repositories only. Do not assume any controllers/services exist beyond what's actually in `src/`; the ERD
 lives in the Obsidian vault, not this repo.
 
 ## Conventions
@@ -25,9 +25,25 @@ lives in the Obsidian vault, not this repo.
 - DTOs are Java `record`s with Bean Validation annotations (`@NotBlank`, `@Size`, ...); entities stay as classes.
   Never expose entities from controllers.
 - Errors: throw `ApiException` via its static factories (`resourceNotFound` -> 404, `badRequest` -> 400,
-  `duplicateResource` -> 409, `conflict` -> 409 for actions invalid in the current state).
-  `exception/GlobalExceptionHandler` (`@RestControllerAdvice`) maps `ApiException`, `@Valid` failures (400) and
-  `DataIntegrityViolationException` (409) to the `ErrorResponse` record.
+  `unauthorized` -> 401, `forbidden` -> 403, `duplicateResource` -> 409, `conflict` -> 409 for actions invalid in
+  the current state). `exception/GlobalExceptionHandler` (`@RestControllerAdvice`) maps `ApiException`, `@Valid`
+  failures (400), `DataIntegrityViolationException` (409) and Spring Security's `AuthenticationException` (401) /
+  `AccessDeniedException` (403) to the `ErrorResponse` record; `config/SecurityConfig` forwards filter-level
+  security errors to it through the `HandlerExceptionResolver`.
+- Security: stateless JWT resource server (`config/SecurityConfig`, HS256 with `JWT_SECRET`). The access token's
+  `permissions` claim maps 1:1 to authorities, so endpoints use `@PreAuthorize("hasAuthority('<Permission>')")` on
+  every controller method — check permissions, never roles. Each `UserRole` declares its `Permission` set and a
+  level (ADMIN > PASTOR > TREASURER). Public routes: `POST /auth/login|refresh|logout`, `GET /public/**`, the
+  Scalar docs and `/error`. The current user's id is the JWT `sub` (`@AuthenticationPrincipal Jwt jwt`); use it for
+  `registeredBy`, never a request field.
+- Auth rules: the refresh token is an opaque random value stored only as SHA-256 in `refresh_token` (`V10`), sent
+  in an `HttpOnly; SameSite=Strict; Path=/auth` cookie, rotated on every refresh; reusing a revoked one revokes all
+  the user's sessions. The first ADMIN is created at startup by `InitialAdminCreator` from `ADMIN_USERNAME` /
+  `ADMIN_PASSWORD` when none exists. Passwords are BCrypt, 12-72 characters.
+- User rules: users are deactivated, never deleted; status is only `ACTIVE`/`INACTIVE` (`V11`). Anti-escalation:
+  an actor can only manage users and assign roles below their own level unless they have `USERS_ADMIN`; nobody
+  edits, deactivates or resets the password of their own account through `/users/{id}` (use `/users/me/password`).
+  Deactivating a user or resetting their password revokes their sessions.
 - Category rules: `type` is immutable after creation; name uniqueness is case-insensitive per type (enforced in
   the service with `...IgnoreCase...` queries and in the DB by the `V7` unique index on `lower(name), type`);
   names are trimmed; categories are deactivated, never deleted. Income/expense modules must reject inactive
@@ -64,5 +80,9 @@ There is no linter or formatter configured in `pom.xml`.
 - `flyway-database-postgresql` (via `spring-boot-starter-flyway`) drives schema migrations from
   `src/main/resources/db/migration`.
 - `springdoc-openapi-starter-webmvc-scalar` serves the API docs UI (Scalar).
-- No Spring Security and no external service SDKs (payments, cloud storage) are present yet — check `pom.xml`
-  before assuming any of these are available.
+- `spring-boot-starter-security-oauth2-resource-server` (Spring Boot 4's name for the resource server starter, with
+  its `-test` companion) provides JWT validation and `JwtEncoder`/`JwtDecoder` via Nimbus.
+- Required env vars: the datasource ones per profile, `JWT_SECRET` (at least 32 characters), and `ADMIN_USERNAME` /
+  `ADMIN_PASSWORD` (optional `ADMIN_FULL_NAME`) only on the first start against an empty DB.
+- No external service SDKs (payments, cloud storage) are present yet — check `pom.xml` before assuming any of these
+  are available.
