@@ -10,6 +10,8 @@ import jakarta.validation.Valid;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
@@ -44,8 +46,9 @@ public class IncomeController {
     @PreAuthorize("hasAuthority('FINANCE_WRITE')")
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    public IncomeResponse createIncome(@Valid @RequestBody IncomeRequest incomeRequest) {
-        return incomeService.createIncome(incomeRequest);
+    public IncomeResponse createIncome(@Valid @RequestBody IncomeRequest incomeRequest,
+                                       @AuthenticationPrincipal Jwt jwt) {
+        return incomeService.createIncome(incomeRequest, UUID.fromString(jwt.getSubject()));
     }
 
     @PreAuthorize("hasAuthority('FINANCE_WRITE')")

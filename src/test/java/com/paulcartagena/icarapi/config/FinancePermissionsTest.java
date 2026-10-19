@@ -25,6 +25,8 @@ import java.time.LocalDate;
 import java.util.UUID;
 import java.util.stream.Stream;
 
+import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.JwtRequestPostProcessor;
+
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.request;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -39,6 +41,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class FinancePermissionsTest {
 
     private static final String ID = UUID.randomUUID().toString();
+    private static final String USER_ID = UUID.randomUUID().toString();
     private static final String TODAY = LocalDate.now().toString();
     private static final String RANGE = "?from=" + TODAY + "&to=" + TODAY;
 
@@ -100,8 +103,12 @@ class FinancePermissionsTest {
         return builder;
     }
 
-    private static SimpleGrantedAuthority[] authoritiesOf(Permission... permissions) {
-        return Stream.of(permissions).map(p -> new SimpleGrantedAuthority(p.name())).toArray(SimpleGrantedAuthority[]::new);
+    // "sub" must be a UUID: create endpoints use it as registeredBy
+    private static JwtRequestPostProcessor token(Permission... permissions) {
+        SimpleGrantedAuthority[] authorities = Stream.of(permissions)
+                .map(p -> new SimpleGrantedAuthority(p.name()))
+                .toArray(SimpleGrantedAuthority[]::new);
+        return jwt().jwt(jwt -> jwt.subject(USER_ID)).authorities(authorities);
     }
 
     @ParameterizedTest(name = "{0} {1} allows every role with {3}")
@@ -112,7 +119,7 @@ class FinancePermissionsTest {
                 continue;
             }
             mockMvc.perform(call(method, url, body)
-                            .with(jwt().authorities(authoritiesOf(role.getPermissions().toArray(Permission[]::new)))))
+                            .with(token(role.getPermissions().toArray(Permission[]::new))))
                     .andExpect(status().is2xxSuccessful());
         }
     }
@@ -123,7 +130,7 @@ class FinancePermissionsTest {
         // Every permission except the required one
         Permission[] others = Stream.of(Permission.values()).filter(p -> p != required).toArray(Permission[]::new);
 
-        mockMvc.perform(call(method, url, body).with(jwt().authorities(authoritiesOf(others))))
+        mockMvc.perform(call(method, url, body).with(token(others)))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.status").value(403));
     }

@@ -7,6 +7,7 @@ import com.paulcartagena.icarapi.exception.ApiException;
 import com.paulcartagena.icarapi.income.dto.*;
 import com.paulcartagena.icarapi.income.entity.Income;
 import com.paulcartagena.icarapi.income.repository.IncomeRepository;
+import com.paulcartagena.icarapi.user.repository.AppUserRepository;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
@@ -27,11 +28,14 @@ public class IncomeService {
 
     private final IncomeRepository incomeRepository;
     private final CategoryRepository categoryRepository;
+    private final AppUserRepository appUserRepository;
 
     public IncomeService(IncomeRepository incomeRepository,
-                         CategoryRepository categoryRepository) {
+                         CategoryRepository categoryRepository,
+                         AppUserRepository appUserRepository) {
         this.incomeRepository = incomeRepository;
         this.categoryRepository = categoryRepository;
+        this.appUserRepository = appUserRepository;
     }
 
     @Transactional(readOnly = true)
@@ -66,7 +70,7 @@ public class IncomeService {
         return buildResponse(findIncome(id));
     }
 
-    public IncomeResponse createIncome(IncomeRequest incomeRequest) {
+    public IncomeResponse createIncome(IncomeRequest incomeRequest, UUID registeredById) {
         Category category = findValidIncomeCategory(incomeRequest.categoryId());
 
         Income income = new Income();
@@ -74,6 +78,9 @@ public class IncomeService {
         income.setAmount(incomeRequest.amount());
         income.setDescription(normalize(incomeRequest.description()));
         income.setDate(incomeRequest.date());
+
+        // The id comes from our own signed JWT, so a reference (no SELECT) is enough to set the FK
+        income.setRegisteredBy(appUserRepository.getReferenceById(registeredById));
 
         Income savedIncome = incomeRepository.save(income);
         return buildResponse(savedIncome);
