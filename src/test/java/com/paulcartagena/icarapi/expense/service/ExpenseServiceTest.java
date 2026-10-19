@@ -11,6 +11,8 @@ import com.paulcartagena.icarapi.expense.dto.ExpenseSummaryResponse;
 import com.paulcartagena.icarapi.expense.dto.ExpenseVoidRequest;
 import com.paulcartagena.icarapi.expense.entity.Expense;
 import com.paulcartagena.icarapi.expense.repository.ExpenseRepository;
+import com.paulcartagena.icarapi.user.entity.AppUser;
+import com.paulcartagena.icarapi.user.repository.AppUserRepository;
 import org.assertj.core.api.ThrowableAssert.ThrowingCallable;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -49,6 +51,9 @@ class ExpenseServiceTest {
 
     @Mock
     private CategoryRepository categoryRepository;
+
+    @Mock
+    private AppUserRepository appUserRepository;
 
     @InjectMocks
     private ExpenseService expenseService;
@@ -109,13 +114,21 @@ class ExpenseServiceTest {
             ExpenseRequest request = new ExpenseRequest(category.getId(), new BigDecimal("50.00"),
                     "  Recibo de luz  ", JAN_1, "   ");
 
-            ExpenseResponse response = expenseService.createExpense(request);
+            UUID userId = UUID.randomUUID();
+            AppUser user = new AppUser();
+            when(appUserRepository.getReferenceById(userId)).thenReturn(user);
+
+            ExpenseResponse response = expenseService.createExpense(request, userId);
 
             assertThat(response.categoryId()).isEqualTo(category.getId());
             assertThat(response.amount()).isEqualByComparingTo("50.00");
             assertThat(response.description()).isEqualTo("Recibo de luz");
             assertThat(response.receiptUrl()).isNull();
             assertThat(response.voided()).isFalse();
+
+            ArgumentCaptor<Expense> captor = ArgumentCaptor.forClass(Expense.class);
+            verify(expenseRepository).save(captor.capture());
+            assertThat(captor.getValue().getRegisteredBy()).isSameAs(user);
         }
 
         @Test
@@ -123,7 +136,7 @@ class ExpenseServiceTest {
             UUID categoryId = UUID.randomUUID();
             when(categoryRepository.findById(categoryId)).thenReturn(Optional.empty());
 
-            assertApiException(() -> expenseService.createExpense(request(categoryId)), HttpStatus.NOT_FOUND);
+            assertApiException(() -> expenseService.createExpense(request(categoryId), UUID.randomUUID()), HttpStatus.NOT_FOUND);
             verify(expenseRepository, never()).save(any());
         }
 
@@ -132,7 +145,7 @@ class ExpenseServiceTest {
             Category category = category(CategoryType.INCOME, true);
             when(categoryRepository.findById(category.getId())).thenReturn(Optional.of(category));
 
-            assertApiException(() -> expenseService.createExpense(request(category.getId())), HttpStatus.BAD_REQUEST);
+            assertApiException(() -> expenseService.createExpense(request(category.getId()), UUID.randomUUID()), HttpStatus.BAD_REQUEST);
             verify(expenseRepository, never()).save(any());
         }
 
@@ -141,7 +154,7 @@ class ExpenseServiceTest {
             Category category = category(CategoryType.EXPENSE, false);
             when(categoryRepository.findById(category.getId())).thenReturn(Optional.of(category));
 
-            assertApiException(() -> expenseService.createExpense(request(category.getId())), HttpStatus.BAD_REQUEST);
+            assertApiException(() -> expenseService.createExpense(request(category.getId()), UUID.randomUUID()), HttpStatus.BAD_REQUEST);
             verify(expenseRepository, never()).save(any());
         }
     }

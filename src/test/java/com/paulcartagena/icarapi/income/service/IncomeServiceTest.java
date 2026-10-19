@@ -12,6 +12,8 @@ import com.paulcartagena.icarapi.income.dto.IncomeSummaryResponse;
 import com.paulcartagena.icarapi.income.dto.IncomeVoidRequest;
 import com.paulcartagena.icarapi.income.entity.Income;
 import com.paulcartagena.icarapi.income.repository.IncomeRepository;
+import com.paulcartagena.icarapi.user.entity.AppUser;
+import com.paulcartagena.icarapi.user.repository.AppUserRepository;
 import org.assertj.core.api.ThrowableAssert.ThrowingCallable;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -50,6 +52,9 @@ class IncomeServiceTest {
 
     @Mock
     private CategoryRepository categoryRepository;
+
+    @Mock
+    private AppUserRepository appUserRepository;
 
     @InjectMocks
     private IncomeService incomeService;
@@ -133,13 +138,21 @@ class IncomeServiceTest {
             IncomeRequest request = new IncomeRequest(category.getId(), new BigDecimal("50.00"),
                     "  Ofrenda dominical  ", JAN_1);
 
-            IncomeResponse response = incomeService.createIncome(request);
+            UUID userId = UUID.randomUUID();
+            AppUser user = new AppUser();
+            when(appUserRepository.getReferenceById(userId)).thenReturn(user);
+
+            IncomeResponse response = incomeService.createIncome(request, userId);
 
             assertThat(response.categoryId()).isEqualTo(category.getId());
             assertThat(response.amount()).isEqualByComparingTo("50.00");
             assertThat(response.description()).isEqualTo("Ofrenda dominical");
             assertThat(response.sourceDonationId()).isNull();
             assertThat(response.voided()).isFalse();
+
+            ArgumentCaptor<Income> captor = ArgumentCaptor.forClass(Income.class);
+            verify(incomeRepository).save(captor.capture());
+            assertThat(captor.getValue().getRegisteredBy()).isSameAs(user);
         }
 
         @Test
@@ -150,7 +163,7 @@ class IncomeServiceTest {
 
             IncomeRequest request = new IncomeRequest(category.getId(), new BigDecimal("50.00"), "   ", JAN_1);
 
-            assertThat(incomeService.createIncome(request).description()).isNull();
+            assertThat(incomeService.createIncome(request, UUID.randomUUID()).description()).isNull();
         }
 
         @Test
@@ -158,7 +171,7 @@ class IncomeServiceTest {
             UUID categoryId = UUID.randomUUID();
             when(categoryRepository.findById(categoryId)).thenReturn(Optional.empty());
 
-            assertApiException(() -> incomeService.createIncome(request(categoryId)), HttpStatus.NOT_FOUND);
+            assertApiException(() -> incomeService.createIncome(request(categoryId), UUID.randomUUID()), HttpStatus.NOT_FOUND);
             verify(incomeRepository, never()).save(any());
         }
 
@@ -167,7 +180,7 @@ class IncomeServiceTest {
             Category category = category(CategoryType.EXPENSE, true);
             when(categoryRepository.findById(category.getId())).thenReturn(Optional.of(category));
 
-            assertApiException(() -> incomeService.createIncome(request(category.getId())), HttpStatus.BAD_REQUEST);
+            assertApiException(() -> incomeService.createIncome(request(category.getId()), UUID.randomUUID()), HttpStatus.BAD_REQUEST);
             verify(incomeRepository, never()).save(any());
         }
 
@@ -176,7 +189,7 @@ class IncomeServiceTest {
             Category category = category(CategoryType.INCOME, false);
             when(categoryRepository.findById(category.getId())).thenReturn(Optional.of(category));
 
-            assertApiException(() -> incomeService.createIncome(request(category.getId())), HttpStatus.BAD_REQUEST);
+            assertApiException(() -> incomeService.createIncome(request(category.getId()), UUID.randomUUID()), HttpStatus.BAD_REQUEST);
             verify(incomeRepository, never()).save(any());
         }
     }

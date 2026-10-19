@@ -7,6 +7,7 @@ import com.paulcartagena.icarapi.exception.ApiException;
 import com.paulcartagena.icarapi.expense.dto.*;
 import com.paulcartagena.icarapi.expense.entity.Expense;
 import com.paulcartagena.icarapi.expense.repository.ExpenseRepository;
+import com.paulcartagena.icarapi.user.repository.AppUserRepository;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
@@ -27,11 +28,14 @@ public class ExpenseService {
 
     private final ExpenseRepository expenseRepository;
     private final CategoryRepository categoryRepository;
+    private final AppUserRepository appUserRepository;
 
     public ExpenseService(ExpenseRepository expenseRepository,
-                          CategoryRepository categoryRepository) {
+                          CategoryRepository categoryRepository,
+                          AppUserRepository appUserRepository) {
         this.expenseRepository = expenseRepository;
         this.categoryRepository = categoryRepository;
+        this.appUserRepository = appUserRepository;
     }
 
     @Transactional(readOnly = true)
@@ -66,7 +70,7 @@ public class ExpenseService {
         return buildResponse(findExpense(id));
     }
 
-    public ExpenseResponse createExpense(ExpenseRequest expenseRequest) {
+    public ExpenseResponse createExpense(ExpenseRequest expenseRequest, UUID registeredById) {
         Category category = findValidExpenseCategory(expenseRequest.categoryId());
 
         Expense expense = new Expense();
@@ -75,6 +79,9 @@ public class ExpenseService {
         expense.setDescription(normalize(expenseRequest.description()));
         expense.setDate(expenseRequest.date());
         expense.setReceiptUrl(normalize(expenseRequest.receiptUrl()));
+
+        // The id comes from our own signed JWT, so a reference (no SELECT) is enough to set the FK
+        expense.setRegisteredBy(appUserRepository.getReferenceById(registeredById));
 
         Expense savedExpense = expenseRepository.save(expense);
         return buildResponse(savedExpense);

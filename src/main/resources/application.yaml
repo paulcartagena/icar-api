@@ -1,6 +1,15 @@
 spring:
   application:
     name: icar-api
+
+jwt:
+  secret: ${JWT_SECRET}
+
+# Only used on startup when no ADMIN user exists yet (see InitialAdminCreator)
+admin:
+  username: ${ADMIN_USERNAME:}
+  password: ${ADMIN_PASSWORD:}
+  full-name: ${ADMIN_FULL_NAME:}
 ---
 spring:
   config:
