@@ -18,6 +18,8 @@ import org.springframework.transaction.annotation.Transactional;
 public class InitialAdminCreator implements CommandLineRunner {
 
     static final int MIN_PASSWORD_LENGTH = 12;
+    // BCrypt only uses the first 72 bytes and Spring Security rejects longer passwords
+    static final int MAX_PASSWORD_LENGTH = 72;
     static final int MAX_USERNAME_LENGTH = 25;
 
     private final AppUserRepository appUserRepository;
@@ -54,9 +56,9 @@ public class InitialAdminCreator implements CommandLineRunner {
             throw new IllegalStateException(
                     "ADMIN_USERNAME must be at most " + MAX_USERNAME_LENGTH + " characters.");
         }
-        if (password.length() < MIN_PASSWORD_LENGTH) {
+        if (password.length() < MIN_PASSWORD_LENGTH || password.length() > MAX_PASSWORD_LENGTH) {
             throw new IllegalStateException(
-                    "ADMIN_PASSWORD must be at least " + MIN_PASSWORD_LENGTH + " characters.");
+                    "ADMIN_PASSWORD must be between " + MIN_PASSWORD_LENGTH + " and " + MAX_PASSWORD_LENGTH + " characters.");
         }
 
         AppUser admin = new AppUser();
