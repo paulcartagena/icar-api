@@ -1,9 +1,13 @@
 package com.paulcartagena.icarapi.exception;
 
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.AuthenticationException;
+import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -21,6 +25,25 @@ public class GlobalExceptionHandler {
 
         return ResponseEntity.status(status)
                 .body(new ErrorResponse(status.value(), ex.getMessage()));
+    }
+
+    // Missing, invalid or expired access token (forwarded here by SecurityConfig's entry point)
+    @ExceptionHandler(AuthenticationException.class)
+    public ResponseEntity<ErrorResponse> handleAuthentication(AuthenticationException ex) {
+        String message = ex instanceof OAuth2AuthenticationException
+                ? "Invalid or expired access token."
+                : "Authentication required.";
+
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                .header(HttpHeaders.WWW_AUTHENTICATE, "Bearer")
+                .body(new ErrorResponse(HttpStatus.UNAUTHORIZED.value(), message));
+    }
+
+    // Authenticated, but the user's role lacks the permission (e.g. @PreAuthorize failed)
+    @ExceptionHandler(AccessDeniedException.class)
+    public ResponseEntity<ErrorResponse> handleAccessDenied(AccessDeniedException ex) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(new ErrorResponse(HttpStatus.FORBIDDEN.value(), "You don't have permission to perform this action."));
     }
 
     // Safety net for races: two concurrent requests pass the service check and hit a DB constraint

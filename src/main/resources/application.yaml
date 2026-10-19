@@ -1,6 +1,9 @@
 spring:
   application:
     name: icar-api
+
+jwt:
+  secret: ${JWT_SECRET}
 ---
 spring:
   config:
