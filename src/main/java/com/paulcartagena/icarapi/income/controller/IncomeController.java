@@ -9,6 +9,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
@@ -26,6 +27,7 @@ public class IncomeController {
         this.incomeService = incomeService;
     }
 
+    @PreAuthorize("hasAuthority('FINANCE_READ')")
     @GetMapping
     public List<IncomeResponse> getAllIncomes(@RequestParam(required = false) UUID categoryId,
                                               @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
@@ -33,28 +35,33 @@ public class IncomeController {
         return incomeService.getAllIncomes(categoryId, from, to);
     }
 
+    @PreAuthorize("hasAuthority('FINANCE_READ')")
     @GetMapping("/{id}")
     public IncomeResponse getIncomeById(@PathVariable UUID id) {
         return incomeService.getIncomeById(id);
     }
 
+    @PreAuthorize("hasAuthority('FINANCE_WRITE')")
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public IncomeResponse createIncome(@Valid @RequestBody IncomeRequest incomeRequest) {
         return incomeService.createIncome(incomeRequest);
     }
 
+    @PreAuthorize("hasAuthority('FINANCE_WRITE')")
     @PutMapping("/{id}")
     public IncomeResponse updateIncome(@PathVariable UUID id, @Valid @RequestBody IncomeRequest incomeRequest) {
         return incomeService.updateIncome(id, incomeRequest);
     }
 
+    @PreAuthorize("hasAuthority('FINANCE_WRITE')")
     @PatchMapping("/{id}/void")
     public IncomeResponse voidIncome(@PathVariable UUID id,
                                      @Valid @RequestBody IncomeVoidRequest incomeVoidRequest) {
         return incomeService.voidIncome(id, incomeVoidRequest);
     }
 
+    @PreAuthorize("hasAuthority('FINANCE_READ')")
     @GetMapping("/summary")
     public IncomeSummaryResponse getSummary(@RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
                                             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {

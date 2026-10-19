@@ -9,6 +9,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
@@ -26,6 +27,7 @@ public class ExpenseController {
         this.expenseService = expenseService;
     }
 
+    @PreAuthorize("hasAuthority('FINANCE_READ')")
     @GetMapping
     public List<ExpenseResponse> getAllExpenses(@RequestParam(required = false) UUID categoryId,
                                                 @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
@@ -33,28 +35,33 @@ public class ExpenseController {
         return expenseService.getAllExpenses(categoryId, from, to);
     }
 
+    @PreAuthorize("hasAuthority('FINANCE_READ')")
     @GetMapping("/{id}")
     public ExpenseResponse getExpenseById(@PathVariable UUID id) {
         return expenseService.getExpenseById(id);
     }
 
+    @PreAuthorize("hasAuthority('FINANCE_WRITE')")
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public ExpenseResponse createExpense(@Valid @RequestBody ExpenseRequest expenseRequest) {
         return expenseService.createExpense(expenseRequest);
     }
 
+    @PreAuthorize("hasAuthority('FINANCE_WRITE')")
     @PutMapping("/{id}")
     public ExpenseResponse updateExpense(@PathVariable UUID id, @Valid @RequestBody ExpenseRequest expenseRequest) {
         return expenseService.updateExpense(id, expenseRequest);
     }
 
+    @PreAuthorize("hasAuthority('FINANCE_WRITE')")
     @PatchMapping("/{id}/void")
     public ExpenseResponse voidExpense(@PathVariable UUID id,
                                        @Valid @RequestBody ExpenseVoidRequest expenseVoidRequest) {
         return expenseService.voidExpense(id, expenseVoidRequest);
     }
 
+    @PreAuthorize("hasAuthority('FINANCE_READ')")
     @GetMapping("/summary")
     public ExpenseSummaryResponse getSummary(@RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
                                              @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
