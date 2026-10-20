@@ -1,5 +1,7 @@
 package com.paulcartagena.icarapi.config;
 
+import com.paulcartagena.icarapi.budget.controller.BudgetController;
+import com.paulcartagena.icarapi.budget.service.BudgetService;
 import com.paulcartagena.icarapi.category.controller.CategoryController;
 import com.paulcartagena.icarapi.category.service.CategoryService;
 import com.paulcartagena.icarapi.expense.controller.ExpenseController;
@@ -34,7 +36,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 // Checks every finance endpoint against the permission it requires, using each role's real permission set
 @WebMvcTest(
-        controllers = {CategoryController.class, ExpenseController.class, IncomeController.class},
+        controllers = {CategoryController.class, ExpenseController.class, IncomeController.class, BudgetController.class},
         properties = "jwt.secret=test-secret-with-at-least-32-characters!!"
 )
 @Import(SecurityConfig.class)
@@ -52,6 +54,9 @@ class FinancePermissionsTest {
             {"name": "Rent"}""";
     private static final String RECORD = """
             {"categoryId": "%s", "amount": 10.00, "date": "%s"}""".formatted(ID, TODAY);
+    private static final String BUDGET = """
+            {"categoryId": "%s", "periodStart": "%s", "periodEnd": "%s", "plannedAmount": 500.00}"""
+            .formatted(ID, TODAY, TODAY);
     private static final String VOID = """
             {"reason": "Duplicated"}""";
 
@@ -66,6 +71,9 @@ class FinancePermissionsTest {
 
     @MockitoBean
     private IncomeService incomeService;
+
+    @MockitoBean
+    private BudgetService budgetService;
 
     static Stream<Arguments> endpoints() {
         return Stream.of(
@@ -87,7 +95,13 @@ class FinancePermissionsTest {
                 endpoint(HttpMethod.GET, "/incomes/summary" + RANGE, null, Permission.FINANCE_READ),
                 endpoint(HttpMethod.POST, "/incomes", RECORD, Permission.FINANCE_WRITE),
                 endpoint(HttpMethod.PUT, "/incomes/" + ID, RECORD, Permission.FINANCE_WRITE),
-                endpoint(HttpMethod.PATCH, "/incomes/" + ID + "/void", VOID, Permission.FINANCE_WRITE)
+                endpoint(HttpMethod.PATCH, "/incomes/" + ID + "/void", VOID, Permission.FINANCE_WRITE),
+
+                endpoint(HttpMethod.GET, "/budgets", null, Permission.FINANCE_READ),
+                endpoint(HttpMethod.GET, "/budgets/" + ID, null, Permission.FINANCE_READ),
+                endpoint(HttpMethod.POST, "/budgets", BUDGET, Permission.FINANCE_WRITE),
+                endpoint(HttpMethod.PUT, "/budgets/" + ID, BUDGET, Permission.FINANCE_WRITE),
+                endpoint(HttpMethod.DELETE, "/budgets/" + ID, null, Permission.FINANCE_WRITE)
         );
     }
 

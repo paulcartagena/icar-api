@@ -9,12 +9,14 @@ membership, site content) plus public read endpoints for a companion public webs
 JPA entities exist for the financial cluster (`AppUser`, `Category`, `Donation`, `Income`, `Expense`, `Budget`),
 membership cluster (`Member`, `Family`, `Ministry`, `ServiceSchedule`, `MemberMinistry`), events
 (`Event`, `EventPhoto`), and site content (`AboutUs`, `ContactInfo`), backed by Flyway migrations in
-`src/main/resources/db/migration` (`V1`-`V11`) and a Postgres datasource configured per-profile (`dev`/`prod`) in
+`src/main/resources/db/migration` (`V1`-`V12`) and a Postgres datasource configured per-profile (`dev`/`prod`) in
 `application.yaml` via env vars (`hibernate.ddl-auto: validate`, so entities and migrations must stay in sync).
 Every entity has a Spring Data repository. The modules with a controller/service layer so far are `category`
 (list, create, update name, activate/deactivate) and `expense` (list with optional `categoryId` and `from`/`to`
 date-range filters, get by id, create, update, void, and a `/summary` of totals per category for a required
-`from`/`to` period) and `income` (a mirror of `expense` with the same endpoints, minus `receiptUrl`), plus
+`from`/`to` period) and `income` (a mirror of `expense` with the same endpoints, minus `receiptUrl`) and `budget` (list with optional
+`categoryId` and `from`/`to` overlap filters, get by id, create, update, delete; every response compares the
+planned amount against the actual totals), plus
 `auth` (login, refresh, logout, me) and `user` (user management, own password change); the rest are entities +
 repositories only. Do not assume any controllers/services exist beyond what's actually in `src/`; the ERD
 lives in the Obsidian vault, not this repo.
@@ -54,6 +56,11 @@ lives in the Obsidian vault, not this repo.
   consistent. Voided expenses still appear in the list but are excluded from totals.
 - Income follows the same void rules as expenses (`V9` `chk_income_void`). Income categories must be of type
   `INCOME`. `sourceDonation` is read-only in the API (not settable via `IncomeRequest`).
+- Budget rules: a budget plans an amount for one category (`EXPENSE` or `INCOME`) over `periodStart`-`periodEnd`
+  (inclusive; `V12` CHECKs keep the period ordered and the amount positive). A category cannot have two budgets
+  with overlapping periods (checked in the service, 409). `actualAmount` is the sum of non-voided expenses or incomes
+  (by category type) of that category in the period, and `remainingAmount = planned - actual` (negative = exceeded).
+  Budgets are plans, not money movements, so they can be deleted. Inactive categories follow the income/expense rule.
 - Never edit an already-applied Flyway migration; add a new `V<n>` file instead.
 
 ## Build, run, test
