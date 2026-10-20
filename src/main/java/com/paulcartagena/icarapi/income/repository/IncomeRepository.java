@@ -7,6 +7,7 @@ import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
@@ -23,4 +24,13 @@ public interface IncomeRepository extends JpaRepository<Income, UUID>, JpaSpecif
         ORDER BY SUM(i.amount) DESC
     """)
     List<IncomeCategoryTotal> sumByCategory(@Param("from") LocalDate from, @Param("to") LocalDate to);
+
+    @Query("""
+        SELECT COALESCE(SUM(i.amount), 0)
+        FROM Income i
+        WHERE i.voided = false AND i.category.id = :categoryId AND i.date BETWEEN :from AND :to
+    """)
+    BigDecimal sumByCategoryBetween(@Param("categoryId") UUID categoryId,
+                                    @Param("from") LocalDate from,
+                                    @Param("to") LocalDate to);
 }
