@@ -62,4 +62,13 @@ public class Donation {
 
     @Column(name = "completed_at")
     private LocalDateTime completedAt;
+
+    @Column(nullable = false)
+    private boolean voided;
+
+    @Column(name = "voided_at")
+    private LocalDateTime voidedAt;
+
+    @Column(name = "void_reason", length = 250)
+    private String voidReason;
 }
