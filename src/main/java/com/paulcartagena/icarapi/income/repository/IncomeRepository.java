@@ -9,10 +9,16 @@ import org.springframework.data.repository.query.Param;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 public interface IncomeRepository extends JpaRepository<Income, UUID>, JpaSpecificationExecutor<Income> {
+
+    Optional<Income> findBySourceDonationId(UUID donationId);
+
+    List<Income> findBySourceDonationIdIn(Collection<UUID> donationIds);
 
     @Query("""
         SELECT new 

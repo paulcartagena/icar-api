@@ -4,6 +4,8 @@ import com.paulcartagena.icarapi.budget.controller.BudgetController;
 import com.paulcartagena.icarapi.budget.service.BudgetService;
 import com.paulcartagena.icarapi.category.controller.CategoryController;
 import com.paulcartagena.icarapi.category.service.CategoryService;
+import com.paulcartagena.icarapi.donation.controller.DonationController;
+import com.paulcartagena.icarapi.donation.service.DonationService;
 import com.paulcartagena.icarapi.expense.controller.ExpenseController;
 import com.paulcartagena.icarapi.expense.service.ExpenseService;
 import com.paulcartagena.icarapi.income.controller.IncomeController;
@@ -36,7 +38,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 // Checks every finance endpoint against the permission it requires, using each role's real permission set
 @WebMvcTest(
-        controllers = {CategoryController.class, ExpenseController.class, IncomeController.class, BudgetController.class},
+        controllers = {CategoryController.class, ExpenseController.class, IncomeController.class, BudgetController.class,
+                DonationController.class},
         properties = "jwt.secret=test-secret-with-at-least-32-characters!!"
 )
 @Import(SecurityConfig.class)
@@ -57,6 +60,8 @@ class FinancePermissionsTest {
     private static final String BUDGET = """
             {"categoryId": "%s", "periodStart": "%s", "periodEnd": "%s", "plannedAmount": 500.00}"""
             .formatted(ID, TODAY, TODAY);
+    private static final String DONATION = """
+            {"amount": 20.00, "method": "CASH", "date": "%s", "categoryId": "%s"}""".formatted(TODAY, ID);
     private static final String VOID = """
             {"reason": "Duplicated"}""";
 
@@ -74,6 +79,9 @@ class FinancePermissionsTest {
 
     @MockitoBean
     private BudgetService budgetService;
+
+    @MockitoBean
+    private DonationService donationService;
 
     static Stream<Arguments> endpoints() {
         return Stream.of(
@@ -101,7 +109,12 @@ class FinancePermissionsTest {
                 endpoint(HttpMethod.GET, "/budgets/" + ID, null, Permission.FINANCE_READ),
                 endpoint(HttpMethod.POST, "/budgets", BUDGET, Permission.FINANCE_WRITE),
                 endpoint(HttpMethod.PUT, "/budgets/" + ID, BUDGET, Permission.FINANCE_WRITE),
-                endpoint(HttpMethod.DELETE, "/budgets/" + ID, null, Permission.FINANCE_WRITE)
+                endpoint(HttpMethod.DELETE, "/budgets/" + ID, null, Permission.FINANCE_WRITE),
+
+                endpoint(HttpMethod.GET, "/donations", null, Permission.FINANCE_READ),
+                endpoint(HttpMethod.GET, "/donations/" + ID, null, Permission.FINANCE_READ),
+                endpoint(HttpMethod.POST, "/donations", DONATION, Permission.FINANCE_WRITE),
+                endpoint(HttpMethod.PATCH, "/donations/" + ID + "/void", VOID, Permission.FINANCE_WRITE)
         );
     }
 
