@@ -93,6 +93,11 @@ public class IncomeService {
             throw ApiException.conflict("Voided income cannot be updated.");
         }
 
+        // Its amount must match the donation, so it is managed from /donations
+        if (income.getSourceDonation() != null) {
+            throw ApiException.conflict("Income linked to a donation cannot be updated.");
+        }
+
         // Only re-validate when the category changes, so incomes whose category
         // was later deactivated can still be corrected
         if (!income.getCategory().getId().equals(incomeRequest.categoryId())) {
@@ -112,6 +117,10 @@ public class IncomeService {
         // Voiding is final: it cannot be repeated or reverted
         if (income.isVoided()) {
             throw ApiException.conflict("Income is already voided.");
+        }
+
+        if (income.getSourceDonation() != null) {
+            throw ApiException.conflict("Income linked to a donation must be voided through the donation.");
         }
 
         income.setVoided(true);

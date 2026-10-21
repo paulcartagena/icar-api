@@ -268,6 +268,16 @@ class IncomeServiceTest {
 
             assertApiException(() -> incomeService.updateIncome(id, request(UUID.randomUUID())), HttpStatus.NOT_FOUND);
         }
+
+        @Test
+        void rejectsIncomeLinkedToDonation() {
+            Income income = income(category(CategoryType.INCOME, true));
+            income.setSourceDonation(new Donation());
+            when(incomeRepository.findById(income.getId())).thenReturn(Optional.of(income));
+
+            assertApiException(() -> incomeService.updateIncome(income.getId(), request(income.getCategory().getId())),
+                    HttpStatus.CONFLICT);
+        }
     }
 
     @Nested
@@ -302,6 +312,17 @@ class IncomeServiceTest {
             when(incomeRepository.findById(id)).thenReturn(Optional.empty());
 
             assertApiException(() -> incomeService.voidIncome(id, new IncomeVoidRequest("Motivo")), HttpStatus.NOT_FOUND);
+        }
+
+        @Test
+        void rejectsIncomeLinkedToDonation() {
+            Income income = income(category(CategoryType.INCOME, true));
+            income.setSourceDonation(new Donation());
+            when(incomeRepository.findById(income.getId())).thenReturn(Optional.of(income));
+
+            assertApiException(() -> incomeService.voidIncome(income.getId(), new IncomeVoidRequest("Motivo")),
+                    HttpStatus.CONFLICT);
+            assertThat(income.isVoided()).isFalse();
         }
     }
 
