@@ -9,14 +9,15 @@ membership, site content) plus public read endpoints for a companion public webs
 JPA entities exist for the financial cluster (`AppUser`, `Category`, `Donation`, `Income`, `Expense`, `Budget`),
 membership cluster (`Member`, `Family`, `Ministry`, `ServiceSchedule`, `MemberMinistry`), events
 (`Event`, `EventPhoto`), and site content (`AboutUs`, `ContactInfo`), backed by Flyway migrations in
-`src/main/resources/db/migration` (`V1`-`V12`) and a Postgres datasource configured per-profile (`dev`/`prod`) in
+`src/main/resources/db/migration` (`V1`-`V13`) and a Postgres datasource configured per-profile (`dev`/`prod`) in
 `application.yaml` via env vars (`hibernate.ddl-auto: validate`, so entities and migrations must stay in sync).
 Every entity has a Spring Data repository. The modules with a controller/service layer so far are `category`
 (list, create, update name, activate/deactivate) and `expense` (list with optional `categoryId` and `from`/`to`
 date-range filters, get by id, create, update, void, and a `/summary` of totals per category for a required
 `from`/`to` period) and `income` (a mirror of `expense` with the same endpoints, minus `receiptUrl`) and `budget` (list with optional
 `categoryId` and `from`/`to` overlap filters, get by id, create, update, delete; every response compares the
-planned amount against the actual totals), plus
+planned amount against the actual totals) and `donation` (list with optional `status`, `method` and `from`/`to`
+filters, get by id, register a cash/transfer donation, void), plus
 `auth` (login, refresh, logout, me) and `user` (user management, own password change); the rest are entities +
 repositories only. Do not assume any controllers/services exist beyond what's actually in `src/`; the ERD
 lives in the Obsidian vault, not this repo.
@@ -55,7 +56,13 @@ lives in the Obsidian vault, not this repo.
   reverted) and blocks updates; the `V8` `chk_expense_void` CHECK keeps `voided`, `voided_at` and `void_reason`
   consistent. Voided expenses still appear in the list but are excluded from totals.
 - Income follows the same void rules as expenses (`V9` `chk_income_void`). Income categories must be of type
-  `INCOME`. `sourceDonation` is read-only in the API (not settable via `IncomeRequest`).
+  `INCOME`. `sourceDonation` is read-only in the API (not settable via `IncomeRequest`), and an income linked to a
+  donation cannot be updated or voided through `/incomes` (409): it is managed from `/donations`.
+- Donation rules: registering a donation (only `CASH`/`TRANSFER`; `PAYPAL` is reserved for the future checkout flow)
+  creates it as `COMPLETED` (`completedAt` = the given date at 00:00) together with its `Income` (chosen `INCOME`
+  category, same amount and date, `sourceDonation` set, `V5` keeps it 1:1) in one transaction. A blank `donorName` is
+  stored as "Anónimo". Donations are never edited or deleted: voiding one (`V13` `chk_donation_void`, same rules as
+  expenses) voids its income too, so totals and budgets stop counting it.
 - Budget rules: a budget plans an amount for one category (`EXPENSE` or `INCOME`) over `periodStart`-`periodEnd`
   (inclusive; `V12` CHECKs keep the period ordered and the amount positive). A category cannot have two budgets
   with overlapping periods (checked in the service, 409). `actualAmount` is the sum of non-voided expenses or incomes
