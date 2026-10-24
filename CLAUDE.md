@@ -9,7 +9,7 @@ membership, site content) plus public read endpoints for a companion public webs
 JPA entities exist for the financial cluster (`AppUser`, `Category`, `Donation`, `Income`, `Expense`, `Budget`),
 membership cluster (`Member`, `Family`, `Ministry`, `ServiceSchedule`, `MemberMinistry`), events
 (`Event`, `EventPhoto`), and site content (`AboutUs`, `ContactInfo`), backed by Flyway migrations in
-`src/main/resources/db/migration` (`V1`-`V13`) and a Postgres datasource configured per-profile (`dev`/`prod`) in
+`src/main/resources/db/migration` (`V1`-`V14`) and a Postgres datasource configured per-profile (`dev`/`prod`) in
 `application.yaml` via env vars (`hibernate.ddl-auto: validate`, so entities and migrations must stay in sync).
 Every entity has a Spring Data repository. The modules with a controller/service layer so far are `category`
 (list, create, update name, activate/deactivate) and `expense` (list with optional `categoryId` and `from`/`to`
@@ -18,8 +18,11 @@ date-range filters, get by id, create, update, void, and a `/summary` of totals 
 `categoryId` and `from`/`to` overlap filters, get by id, create, update, delete; every response compares the
 planned amount against the actual totals) and `donation` (list with optional `status`, `method` and `from`/`to`
 filters, get by id, register a cash/transfer donation, void), plus
-`auth` (login, refresh, logout, me) and `user` (user management, own password change); the rest are entities +
-repositories only. Do not assume any controllers/services exist beyond what's actually in `src/`; the ERD
+`auth` (login, refresh, logout, me) and `user` (user management, own password change), plus the membership cluster:
+`member` (list with optional `status`, `familyId`, `ministryId` and name `search` filters, get by id, create, update),
+`family` (list, get by id, create, update, delete) and `ministry` (CRUD, plus `/ministries/{id}/members` to list,
+assign and remove members and `/ministries/{id}/schedules` to add, update and delete service schedules); events and
+site content are entities + repositories only. Do not assume any controllers/services exist beyond what's actually in `src/`; the ERD
 lives in the Obsidian vault, not this repo.
 
 ## Conventions
@@ -68,6 +71,15 @@ lives in the Obsidian vault, not this repo.
   with overlapping periods (checked in the service, 409). `actualAmount` is the sum of non-voided expenses or incomes
   (by category type) of that category in the period, and `remainingAmount = planned - actual` (negative = exceeded).
   Budgets are plans, not money movements, so they can be deleted. Inactive categories follow the income/expense rule.
+- Membership rules: all membership endpoints use `MEMBERS_READ` / `MEMBERS_WRITE`. Members are never deleted (a member
+  who leaves is marked `INACTIVE` or `DECEASED`); names are trimmed and blank email/phone stored as null. A family's
+  responsible always belongs to that family: creating a family moves the responsible into it (409 if they already
+  lead another family, `V2` unique), a new responsible must already be a member of it, and the responsible can't
+  change family through `/members` (409). A family can only be deleted when the responsible is its only member (they
+  are left without family). Members join families by setting `familyId` on the member. Ministry names are unique
+  case-insensitively (service + `V14` index on `lower(name)`); deleting a ministry removes its schedules and
+  assignments. `INACTIVE`/`DECEASED` members can't be assigned to a ministry; `joinedAt` defaults to now. Schedules
+  use `java.time.DayOfWeek`, always belong to a ministry and can't repeat day + time within it (`V14`).
 - Never edit an already-applied Flyway migration; add a new `V<n>` file instead.
 
 ## Build, run, test
