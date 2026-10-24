@@ -6,6 +6,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+import java.time.DayOfWeek;
 import java.time.LocalTime;
 import java.util.UUID;
 
@@ -21,11 +22,12 @@ public class ServiceSchedule {
     private UUID id;
 
     @ManyToOne
-    @JoinColumn(name = "ministry_id")
+    @JoinColumn(name = "ministry_id", nullable = false)
     private Ministry ministry;
 
+    @Enumerated(EnumType.STRING)
     @Column(name = "day_of_week", length = 25, nullable = false)
-    private String dayOfWeek;
+    private DayOfWeek dayOfWeek;
 
     @Column(nullable = false)
     private LocalTime startTime;
