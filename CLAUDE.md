@@ -9,7 +9,7 @@ membership, site content) plus public read endpoints for a companion public webs
 JPA entities exist for the financial cluster (`AppUser`, `Category`, `Donation`, `Income`, `Expense`, `Budget`),
 membership cluster (`Member`, `Family`, `Ministry`, `ServiceSchedule`, `MemberMinistry`), events
 (`Event`, `EventPhoto`), and site content (`AboutUs`, `ContactInfo`), backed by Flyway migrations in
-`src/main/resources/db/migration` (`V1`-`V14`) and a Postgres datasource configured per-profile (`dev`/`prod`) in
+`src/main/resources/db/migration` (`V1`-`V15`) and a Postgres datasource configured per-profile (`dev`/`prod`) in
 `application.yaml` via env vars (`hibernate.ddl-auto: validate`, so entities and migrations must stay in sync).
 Every entity has a Spring Data repository. The modules with a controller/service layer so far are `category`
 (list, create, update name, activate/deactivate) and `expense` (list with optional `categoryId` and `from`/`to`
@@ -21,8 +21,10 @@ filters, get by id, register a cash/transfer donation, void), plus
 `auth` (login, refresh, logout, me) and `user` (user management, own password change), plus the membership cluster:
 `member` (list with optional `status`, `familyId`, `ministryId` and name `search` filters, get by id, create, update),
 `family` (list, get by id, create, update, delete) and `ministry` (CRUD, plus `/ministries/{id}/members` to list,
-assign and remove members and `/ministries/{id}/schedules` to add, update and delete service schedules); events and
-site content are entities + repositories only. Do not assume any controllers/services exist beyond what's actually in `src/`; the ERD
+assign and remove members and `/ministries/{id}/schedules` to add, update and delete service schedules), plus
+`event` (admin `/events`: list with optional `active` and `from`/`to` overlap filters, get by id, create, update,
+activate/deactivate, delete, and `/events/{id}/photos` to add, update and delete photos; public `GET /public/events`
+and `/public/events/{id}`); site content is entities + repositories only. Do not assume any controllers/services exist beyond what's actually in `src/`; the ERD
 lives in the Obsidian vault, not this repo.
 
 ## Conventions
@@ -80,6 +82,13 @@ lives in the Obsidian vault, not this repo.
   case-insensitively (service + `V14` index on `lower(name)`); deleting a ministry removes its schedules and
   assignments. `INACTIVE`/`DECEASED` members can't be assigned to a ministry; `joinedAt` defaults to now. Schedules
   use `java.time.DayOfWeek`, always belong to a ministry and can't repeat day + time within it (`V14`).
+- Event rules: admin endpoints (reads included, there is no `CONTENT_READ`) use `CONTENT_WRITE`; public ones are
+  `GET /public/events/**` with `@PreAuthorize("permitAll()")` and only show active events (inactive ones answer 404).
+  `endAt >= startAt` (service + `V15` `chk_event_period`); title/description trimmed, blank location stored as null;
+  events are created active and can be deleted (site content, not money; photos go with them). Without `from`/`to`
+  the public list returns upcoming and in-progress events (`endAt >= now`), soonest first. Photos only store an
+  `imageUrl` (no file storage yet); `displayOrder` is required in the DB (`V15`), defaults to last on add, is kept on
+  update when omitted, and may repeat.
 - Never edit an already-applied Flyway migration; add a new `V<n>` file instead.
 
 ## Build, run, test

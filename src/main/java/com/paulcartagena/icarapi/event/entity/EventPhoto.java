@@ -26,6 +26,6 @@ public class EventPhoto {
     @Column(name = "image_url", length = 500, nullable = false)
     private String imageUrl;
 
-    @Column(name = "display_order")
+    @Column(name = "display_order", nullable = false)
     private Integer displayOrder;
 }
