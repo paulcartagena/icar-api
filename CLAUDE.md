@@ -9,7 +9,7 @@ membership, site content) plus public read endpoints for a companion public webs
 JPA entities exist for the financial cluster (`AppUser`, `Category`, `Donation`, `Income`, `Expense`, `Budget`),
 membership cluster (`Member`, `Family`, `Ministry`, `ServiceSchedule`, `MemberMinistry`), events
 (`Event`, `EventPhoto`), and site content (`AboutUs`, `ContactInfo`), backed by Flyway migrations in
-`src/main/resources/db/migration` (`V1`-`V15`) and a Postgres datasource configured per-profile (`dev`/`prod`) in
+`src/main/resources/db/migration` (`V1`-`V16`) and a Postgres datasource configured per-profile (`dev`/`prod`) in
 `application.yaml` via env vars (`hibernate.ddl-auto: validate`, so entities and migrations must stay in sync).
 Every entity has a Spring Data repository. The modules with a controller/service layer so far are `category`
 (list, create, update name, activate/deactivate) and `expense` (list with optional `categoryId` and `from`/`to`
@@ -24,7 +24,8 @@ filters, get by id, register a cash/transfer donation, void), plus
 assign and remove members and `/ministries/{id}/schedules` to add, update and delete service schedules), plus
 `event` (admin `/events`: list with optional `active` and `from`/`to` overlap filters, get by id, create, update,
 activate/deactivate, delete, and `/events/{id}/photos` to add, update and delete photos; public `GET /public/events`
-and `/public/events/{id}`); site content is entities + repositories only. Do not assume any controllers/services exist beyond what's actually in `src/`; the ERD
+and `/public/events/{id}`) and `sitecontent` (`PUT /site-content/about-us|contact-info` and their public
+`GET /public/about-us|contact-info`). Do not assume any controllers/services exist beyond what's actually in `src/`; the ERD
 lives in the Obsidian vault, not this repo.
 
 ## Conventions
@@ -89,6 +90,9 @@ lives in the Obsidian vault, not this repo.
   the public list returns upcoming and in-progress events (`endAt >= now`), soonest first. Photos only store an
   `imageUrl` (no file storage yet); `displayOrder` is required in the DB (`V15`), defaults to last on add, is kept on
   update when omitted, and may repeat.
+- Site content rules: `AboutUs` and `ContactInfo` are single records (`V16` unique index on `(true)`): `PUT` under
+  `/site-content` (`CONTENT_WRITE`) creates them the first time and updates them afterwards; there are no admin GETs
+  (the panel reads the public ones). Public GETs answer 404 until configured. All fields are required and trimmed.
 - Never edit an already-applied Flyway migration; add a new `V<n>` file instead.
 
 ## Build, run, test
