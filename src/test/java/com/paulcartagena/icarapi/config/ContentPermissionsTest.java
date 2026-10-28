@@ -3,6 +3,9 @@ package com.paulcartagena.icarapi.config;
 import com.paulcartagena.icarapi.event.controller.EventController;
 import com.paulcartagena.icarapi.event.controller.PublicEventController;
 import com.paulcartagena.icarapi.event.service.EventService;
+import com.paulcartagena.icarapi.sitecontent.controller.PublicSiteContentController;
+import com.paulcartagena.icarapi.sitecontent.controller.SiteContentController;
+import com.paulcartagena.icarapi.sitecontent.service.SiteContentService;
 import com.paulcartagena.icarapi.user.enums.Permission;
 import com.paulcartagena.icarapi.user.enums.UserRole;
 import org.junit.jupiter.api.Test;
@@ -31,9 +34,11 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-// Checks every event endpoint against the permission it requires, and that the public ones need no token
+// Checks every content endpoint (events, site content) against the permission it requires, and that the public
+// ones need no token
 @WebMvcTest(
-        controllers = {EventController.class, PublicEventController.class},
+        controllers = {EventController.class, PublicEventController.class,
+                SiteContentController.class, PublicSiteContentController.class},
         properties = "jwt.secret=test-secret-with-at-least-32-characters!!"
 )
 @Import(SecurityConfig.class)
@@ -48,12 +53,20 @@ class ContentPermissionsTest {
              "startAt": "2026-12-24T19:00:00", "endAt": "2026-12-24T21:00:00"}""";
     private static final String PHOTO = """
             {"imageUrl": "https://cdn.icar.org/1.jpg"}""";
+    private static final String ABOUT_US = """
+            {"title": "Quiénes somos", "body": "Somos una iglesia", "imageUrl": "https://cdn.icar.org/a.jpg"}""";
+    private static final String CONTACT_INFO = """
+            {"address": "Calle 1", "phone": "555-1234", "email": "info@icar.org",
+             "mapUrl": "https://maps.example.com/icar"}""";
 
     @Autowired
     private MockMvc mockMvc;
 
     @MockitoBean
     private EventService eventService;
+
+    @MockitoBean
+    private SiteContentService siteContentService;
 
     static Stream<Arguments> endpoints() {
         return Stream.of(
@@ -66,11 +79,13 @@ class ContentPermissionsTest {
                 endpoint(HttpMethod.DELETE, "/events/" + ID, null),
                 endpoint(HttpMethod.POST, "/events/" + ID + "/photos", PHOTO),
                 endpoint(HttpMethod.PUT, "/events/" + ID + "/photos/" + OTHER_ID, PHOTO),
-                endpoint(HttpMethod.DELETE, "/events/" + ID + "/photos/" + OTHER_ID, null)
+                endpoint(HttpMethod.DELETE, "/events/" + ID + "/photos/" + OTHER_ID, null),
+                endpoint(HttpMethod.PUT, "/site-content/about-us", ABOUT_US),
+                endpoint(HttpMethod.PUT, "/site-content/contact-info", CONTACT_INFO)
         );
     }
 
-    // Every admin event endpoint requires CONTENT_WRITE
+    // Every admin content endpoint requires CONTENT_WRITE
     private static Arguments endpoint(HttpMethod method, String url, String body) {
         return Arguments.of(method, url, body);
     }
@@ -128,6 +143,12 @@ class ContentPermissionsTest {
         mockMvc.perform(get("/public/events")).andExpect(status().isOk());
         mockMvc.perform(get("/public/events?from=2026-12-01&to=2026-12-31")).andExpect(status().isOk());
         mockMvc.perform(get("/public/events/" + ID)).andExpect(status().isOk());
+    }
+
+    @Test
+    void publicSiteContentNeedsNoToken() throws Exception {
+        mockMvc.perform(get("/public/about-us")).andExpect(status().isOk());
+        mockMvc.perform(get("/public/contact-info")).andExpect(status().isOk());
     }
 
     @Test
