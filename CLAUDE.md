@@ -117,7 +117,17 @@ This project uses the Maven wrapper — always invoke `./mvnw`, not a system-ins
 ./mvnw test -Dtest=IcarApiApplicationTests#contextLoads  # run a single test method
 ```
 
-There is no linter or formatter configured in `pom.xml`.
+There is no linter or formatter configured in `pom.xml`. `IcarApiApplicationTests#contextLoads` boots the whole app,
+so it needs a Postgres and the env vars below (in CI it runs against a Postgres service, which also exercises every
+migration and `ddl-auto: validate`).
+
+CI (`.github/workflows/ci.yml`): on every PR and push to `main` it runs `./mvnw -B test` and builds the multi-arch
+image from the `Dockerfile` (multi-stage, runs as a non-root user); on `main` it pushes it to
+`ghcr.io/paulcartagena/icar-api` (`latest` and the commit SHA) and deploys it to EC2 over SSH (`docker compose pull`
+in `~/icar`; skipped until the `EC2_HOST` / `EC2_USER` / `EC2_SSH_KEY` secrets exist). `deploy/` holds what runs on
+the server: `docker-compose.yml` (API + Caddy with automatic HTTPS), `Caddyfile`, `.env.example`, `setup-ec2.sh`
+and the step-by-step guide (`deploy/README.md`, EC2 t4g.micro + RDS PostgreSQL). The deploy only updates the image:
+changes to the compose file or Caddyfile must be copied to the server by hand.
 
 ## Stack
 
@@ -134,6 +144,7 @@ There is no linter or formatter configured in `pom.xml`.
   its `-test` companion) provides JWT validation and `JwtEncoder`/`JwtDecoder` via Nimbus.
 - Required env vars: the datasource ones per profile, `JWT_SECRET` (at least 32 characters), and `ADMIN_USERNAME` /
   `ADMIN_PASSWORD` (optional `ADMIN_FULL_NAME`) only on the first start against an empty DB. Optional:
-  `CORS_ALLOWED_ORIGINS` (comma-separated, required in production) and `PORT` (default 8080).
+  `CORS_ALLOWED_ORIGINS` (comma-separated, required in production), `PORT` (default 8080) and `API_DOCS_ENABLED`
+  (Scalar and `/v3/api-docs`: open by default, closed in the `prod` profile unless set to `true`).
 - No external service SDKs (payments, cloud storage) are present yet — check `pom.xml` before assuming any of these
   are available.

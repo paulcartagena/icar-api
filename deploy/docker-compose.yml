@@ -1,0 +1,31 @@
+# Runs on the EC2 instance (~/icar). Secrets live in .env next to this file (see .env.example).
+services:
+  api:
+    image: ghcr.io/paulcartagena/icar-api:latest
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      # t4g.micro has 1 GB of RAM: cap the heap and use the lighter collector
+      JAVA_TOOL_OPTIONS: -Xmx400m -XX:+UseSerialGC
+    # Not published: only reachable through Caddy
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      API_DOMAIN: ${API_DOMAIN}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - api
+
+volumes:
+  # Holds the Let's Encrypt certificates; keep it so restarts don't re-issue them
+  caddy_data:
+  caddy_config:
