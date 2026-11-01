@@ -55,6 +55,19 @@
             <artifactId>spring-boot-starter-security-oauth2-resource-server</artifactId>
         </dependency>
 
+        <!-- Actuator: only /actuator/health is exposed, for the deploy health check. -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
+
+        <!-- Bucket4j: in-memory token buckets for the login rate limit. -->
+        <dependency>
+            <groupId>com.bucket4j</groupId>
+            <artifactId>bucket4j_jdk17-core</artifactId>
+            <version>8.19.0</version>
+        </dependency>
+
         <!-- Postgres driver, runtime only. -->
         <dependency>
             <groupId>org.postgresql</groupId>

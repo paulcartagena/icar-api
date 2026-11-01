@@ -35,20 +35,27 @@ lives in the Obsidian vault, not this repo.
   Never expose entities from controllers.
 - Errors: throw `ApiException` via its static factories (`resourceNotFound` -> 404, `badRequest` -> 400,
   `unauthorized` -> 401, `forbidden` -> 403, `duplicateResource` -> 409, `conflict` -> 409 for actions invalid in
-  the current state). `exception/GlobalExceptionHandler` (`@RestControllerAdvice`) maps `ApiException`, `@Valid`
+  the current state, `tooManyRequests` -> 429). `exception/GlobalExceptionHandler` (`@RestControllerAdvice`) maps `ApiException`, `@Valid`
   failures (400), `DataIntegrityViolationException` (409) and Spring Security's `AuthenticationException` (401) /
   `AccessDeniedException` (403) to the `ErrorResponse` record; `config/SecurityConfig` forwards filter-level
   security errors to it through the `HandlerExceptionResolver`.
 - Security: stateless JWT resource server (`config/SecurityConfig`, HS256 with `JWT_SECRET`). The access token's
   `permissions` claim maps 1:1 to authorities, so endpoints use `@PreAuthorize("hasAuthority('<Permission>')")` on
   every controller method — check permissions, never roles. Each `UserRole` declares its `Permission` set and a
-  level (ADMIN > PASTOR > TREASURER). Public routes: `POST /auth/login|refresh|logout`, `GET /public/**`, the
-  Scalar docs and `/error`. The current user's id is the JWT `sub` (`@AuthenticationPrincipal Jwt jwt`); use it for
+  level (ADMIN > PASTOR > TREASURER). Public routes: `POST /auth/login|refresh|logout`, `GET /public/**`,
+  `GET /actuator/health` (the only Actuator endpoint exposed), the Scalar docs and `/error`. CORS origins come from
+  `CORS_ALLOWED_ORIGINS` (`CorsProperties`, defaults to local dev ports) with credentials allowed, so they must be
+  listed explicitly. The current user's id is the JWT `sub` (`@AuthenticationPrincipal Jwt jwt`); use it for
   `registeredBy`, never a request field.
 - Auth rules: the refresh token is an opaque random value stored only as SHA-256 in `refresh_token` (`V10`), sent
   in an `HttpOnly; SameSite=Strict; Path=/auth` cookie, rotated on every refresh; reusing a revoked one revokes all
   the user's sessions. The first ADMIN is created at startup by `InitialAdminCreator` from `ADMIN_USERNAME` /
-  `ADMIN_PASSWORD` when none exists. Passwords are BCrypt, 12-72 characters.
+  `ADMIN_PASSWORD` when none exists. Passwords are BCrypt, 12-72 characters. `POST /auth/login` is rate limited per
+  client IP (`LoginRateLimitFilter`, Bucket4j in memory, `auth.login-rate-limit.*`, 5 per minute by default): over
+  the limit it answers 429 (`ApiException.tooManyRequests`) with `Retry-After`. The IP is `getRemoteAddr()`, which
+  `server.forward-headers-strategy: native` resolves from `X-Forwarded-For` only for private-network proxies; never
+  read that header directly. The filter is created inside `SecurityConfig`, not as a bean, so it isn't also
+  registered as a servlet filter.
 - User rules: users are deactivated, never deleted; status is only `ACTIVE`/`INACTIVE` (`V11`). Anti-escalation:
   an actor can only manage users and assign roles below their own level unless they have `USERS_ADMIN`; nobody
   edits, deactivates or resets the password of their own account through `/users/{id}` (use `/users/me/password`).
@@ -119,9 +126,11 @@ There is no linter or formatter configured in `pom.xml`.
 - `flyway-database-postgresql` (via `spring-boot-starter-flyway`) drives schema migrations from
   `src/main/resources/db/migration`.
 - `springdoc-openapi-starter-webmvc-scalar` serves the API docs UI (Scalar).
+- `spring-boot-starter-actuator` (only `health` exposed) and `bucket4j_jdk17-core` (login rate limit).
 - `spring-boot-starter-security-oauth2-resource-server` (Spring Boot 4's name for the resource server starter, with
   its `-test` companion) provides JWT validation and `JwtEncoder`/`JwtDecoder` via Nimbus.
 - Required env vars: the datasource ones per profile, `JWT_SECRET` (at least 32 characters), and `ADMIN_USERNAME` /
-  `ADMIN_PASSWORD` (optional `ADMIN_FULL_NAME`) only on the first start against an empty DB.
+  `ADMIN_PASSWORD` (optional `ADMIN_FULL_NAME`) only on the first start against an empty DB. Optional:
+  `CORS_ALLOWED_ORIGINS` (comma-separated, required in production) and `PORT` (default 8080).
 - No external service SDKs (payments, cloud storage) are present yet — check `pom.xml` before assuming any of these
   are available.

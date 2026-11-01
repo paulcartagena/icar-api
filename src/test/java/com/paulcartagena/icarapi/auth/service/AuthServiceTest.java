@@ -57,7 +57,8 @@ class AuthServiceTest {
 
     @BeforeEach
     void setUp() {
-        AuthProperties properties = new AuthProperties(Duration.ofMinutes(15), Duration.ofDays(7), true);
+        AuthProperties properties = new AuthProperties(Duration.ofMinutes(15), Duration.ofDays(7), true,
+                new AuthProperties.LoginRateLimit(5, Duration.ofMinutes(1)));
         authService = new AuthService(appUserRepository, refreshTokenRepository, passwordEncoder,
                 accessTokenService, properties);
     }
