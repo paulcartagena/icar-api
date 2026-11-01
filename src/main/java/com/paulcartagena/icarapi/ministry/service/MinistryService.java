@@ -91,6 +91,20 @@ public class MinistryService {
         ministryRepository.delete(findMinistry(id));
     }
 
+    // --- Public website ---
+
+    @Transactional(readOnly = true)
+    public List<PublicMinistryResponse> getPublicMinistries() {
+        return ministryRepository.findAll(Sort.by("name")).stream()
+                .map(this::buildPublicResponse)
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public PublicMinistryResponse getPublicMinistryById(UUID id) {
+        return buildPublicResponse(findMinistry(id));
+    }
+
     // --- Members of the ministry ---
 
     @Transactional(readOnly = true)
@@ -185,19 +199,31 @@ public class MinistryService {
     }
 
     private MinistryResponse buildResponse(Ministry ministry) {
-        List<ServiceScheduleResponse> schedules = ministry.getServices().stream()
-                .sorted(Comparator.comparing(ServiceSchedule::getDayOfWeek)
-                        .thenComparing(ServiceSchedule::getStartTime))
-                .map(this::buildScheduleResponse)
-                .toList();
-
         return new MinistryResponse(
                 ministry.getId(),
                 ministry.getName(),
                 ministry.getDescription(),
                 ministry.getMembers().size(),
-                schedules
+                buildSchedules(ministry)
         );
+    }
+
+    private PublicMinistryResponse buildPublicResponse(Ministry ministry) {
+        return new PublicMinistryResponse(
+                ministry.getId(),
+                ministry.getName(),
+                ministry.getDescription(),
+                buildSchedules(ministry)
+        );
+    }
+
+    // Monday first, then by start time
+    private List<ServiceScheduleResponse> buildSchedules(Ministry ministry) {
+        return ministry.getServices().stream()
+                .sorted(Comparator.comparing(ServiceSchedule::getDayOfWeek)
+                        .thenComparing(ServiceSchedule::getStartTime))
+                .map(this::buildScheduleResponse)
+                .toList();
     }
 
     private ServiceScheduleResponse buildScheduleResponse(ServiceSchedule schedule) {
