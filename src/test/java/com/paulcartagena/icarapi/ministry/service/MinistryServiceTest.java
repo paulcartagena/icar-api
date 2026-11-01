@@ -21,16 +21,19 @@ import org.junit.jupiter.params.provider.EnumSource;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 
 import java.time.DayOfWeek;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -208,6 +211,48 @@ class MinistryServiceTest {
             assertApiException(() -> ministryService.deleteSchedule(ministry.getId(), scheduleId),
                     HttpStatus.NOT_FOUND);
         }
+    }
+
+    @Nested
+    class PublicWebsite {
+
+        @Test
+        void listsMinistriesByNameWithSchedulesSortedByDayAndTime() {
+            Ministry ministry = ministry();
+            ministry.getServices().add(schedule(ministry, DayOfWeek.SUNDAY, LocalTime.of(18, 0)));
+            ministry.getServices().add(schedule(ministry, DayOfWeek.WEDNESDAY, LocalTime.of(19, 30)));
+            ministry.getServices().add(schedule(ministry, DayOfWeek.SUNDAY, TEN));
+            when(ministryRepository.findAll(Sort.by("name"))).thenReturn(List.of(ministry));
+
+            List<PublicMinistryResponse> response = ministryService.getPublicMinistries();
+
+            assertThat(response).singleElement().satisfies(m -> {
+                assertThat(m.name()).isEqualTo("Alabanza");
+                assertThat(m.schedules())
+                        .extracting(ServiceScheduleResponse::dayOfWeek, ServiceScheduleResponse::startTime)
+                        .containsExactly(
+                                tuple(DayOfWeek.WEDNESDAY, LocalTime.of(19, 30)),
+                                tuple(DayOfWeek.SUNDAY, TEN),
+                                tuple(DayOfWeek.SUNDAY, LocalTime.of(18, 0)));
+            });
+        }
+
+        @Test
+        void returnsNotFoundForMissingMinistry() {
+            UUID id = UUID.randomUUID();
+            when(ministryRepository.findById(id)).thenReturn(Optional.empty());
+
+            assertApiException(() -> ministryService.getPublicMinistryById(id), HttpStatus.NOT_FOUND);
+        }
+    }
+
+    private static ServiceSchedule schedule(Ministry ministry, DayOfWeek day, LocalTime startTime) {
+        ServiceSchedule schedule = new ServiceSchedule();
+        schedule.setId(UUID.randomUUID());
+        schedule.setMinistry(ministry);
+        schedule.setDayOfWeek(day);
+        schedule.setStartTime(startTime);
+        return schedule;
     }
 
     private static void assertApiException(ThrowingCallable call, HttpStatus status) {

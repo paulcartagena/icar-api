@@ -21,7 +21,8 @@ filters, get by id, register a cash/transfer donation, void), plus
 `auth` (login, refresh, logout, me) and `user` (user management, own password change), plus the membership cluster:
 `member` (list with optional `status`, `familyId`, `ministryId` and name `search` filters, get by id, create, update),
 `family` (list, get by id, create, update, delete) and `ministry` (CRUD, plus `/ministries/{id}/members` to list,
-assign and remove members and `/ministries/{id}/schedules` to add, update and delete service schedules), plus
+assign and remove members and `/ministries/{id}/schedules` to add, update and delete service schedules; public
+`GET /public/ministries` and `/public/ministries/{id}` with their schedules), plus
 `event` (admin `/events`: list with optional `active` and `from`/`to` overlap filters, get by id, create, update,
 activate/deactivate, delete, and `/events/{id}/photos` to add, update and delete photos; public `GET /public/events`
 and `/public/events/{id}`) and `sitecontent` (`PUT /site-content/about-us|contact-info` and their public
@@ -81,7 +82,9 @@ lives in the Obsidian vault, not this repo.
   with overlapping periods (checked in the service, 409). `actualAmount` is the sum of non-voided expenses or incomes
   (by category type) of that category in the period, and `remainingAmount = planned - actual` (negative = exceeded).
   Budgets are plans, not money movements, so they can be deleted. Inactive categories follow the income/expense rule.
-- Membership rules: all membership endpoints use `MEMBERS_READ` / `MEMBERS_WRITE`. Members are never deleted (a member
+- Membership rules: all membership endpoints use `MEMBERS_READ` / `MEMBERS_WRITE`, except the public ministries
+  (`@PreAuthorize("permitAll()")`), which list every ministry by name with its schedules (Monday first, then by time)
+  through `PublicMinistryResponse`: no member data, not even the count. Members are never deleted (a member
   who leaves is marked `INACTIVE` or `DECEASED`); names are trimmed and blank email/phone stored as null. A family's
   responsible always belongs to that family: creating a family moves the responsible into it (409 if they already
   lead another family, `V2` unique), a new responsible must already be a member of it, and the responsible can't

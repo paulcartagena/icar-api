@@ -5,9 +5,11 @@ import com.paulcartagena.icarapi.family.service.FamilyService;
 import com.paulcartagena.icarapi.member.controller.MemberController;
 import com.paulcartagena.icarapi.member.service.MemberService;
 import com.paulcartagena.icarapi.ministry.controller.MinistryController;
+import com.paulcartagena.icarapi.ministry.controller.PublicMinistryController;
 import com.paulcartagena.icarapi.ministry.service.MinistryService;
 import com.paulcartagena.icarapi.user.enums.Permission;
 import com.paulcartagena.icarapi.user.enums.UserRole;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -28,13 +30,17 @@ import java.util.stream.Stream;
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.JwtRequestPostProcessor;
 
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.request;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-// Checks every membership endpoint against the permission it requires, using each role's real permission set
+// Checks every membership endpoint against the permission it requires, using each role's real permission set,
+// and that the public ministries need no token
 @WebMvcTest(
-        controllers = {MemberController.class, FamilyController.class, MinistryController.class},
+        controllers = {MemberController.class, FamilyController.class, MinistryController.class,
+                PublicMinistryController.class},
         properties = "jwt.secret=test-secret-with-at-least-32-characters!!"
 )
 @Import(SecurityConfig.class)
@@ -144,5 +150,18 @@ class MembershipPermissionsTest {
         mockMvc.perform(call(method, url, body)
                         .with(token(UserRole.TREASURER.getPermissions().toArray(Permission[]::new))))
                 .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void publicMinistriesNeedNoToken() throws Exception {
+        mockMvc.perform(get("/public/ministries")).andExpect(status().isOk());
+        mockMvc.perform(get("/public/ministries/" + ID)).andExpect(status().isOk());
+    }
+
+    @Test
+    void onlyGetIsPublic() throws Exception {
+        // POST isn't mapped under /public, but it must be rejected by security before anything else
+        mockMvc.perform(post("/public/ministries").contentType(MediaType.APPLICATION_JSON).content(MINISTRY))
+                .andExpect(status().isUnauthorized());
     }
 }
