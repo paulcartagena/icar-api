@@ -22,16 +22,21 @@ import java.time.Instant;
 import java.util.List;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.options;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 // Any protected endpoint works here; /categories is just a convenient one
-@WebMvcTest(controllers = CategoryController.class, properties = "jwt.secret=" + SecurityConfigTest.SECRET)
+@WebMvcTest(controllers = CategoryController.class, properties = {
+        "jwt.secret=" + SecurityConfigTest.SECRET,
+        "cors.allowed-origins=" + SecurityConfigTest.ALLOWED_ORIGIN
+})
 @Import(SecurityConfig.class)
 class SecurityConfigTest {
 
     static final String SECRET = "test-secret-with-at-least-32-characters!!";
+    static final String ALLOWED_ORIGIN = "https://admin.icar.org";
 
     @Autowired
     private MockMvc mockMvc;
@@ -86,6 +91,34 @@ class SecurityConfigTest {
 
         mockMvc.perform(get("/categories").header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
                 .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void preflightFromAllowedOriginIsAnsweredWithoutToken() throws Exception {
+        mockMvc.perform(options("/categories")
+                        .header(HttpHeaders.ORIGIN, ALLOWED_ORIGIN)
+                        .header(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD, "POST")
+                        .header(HttpHeaders.ACCESS_CONTROL_REQUEST_HEADERS, "Authorization, Content-Type"))
+                .andExpect(status().isOk())
+                .andExpect(header().string(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN, ALLOWED_ORIGIN))
+                .andExpect(header().string(HttpHeaders.ACCESS_CONTROL_ALLOW_CREDENTIALS, "true"));
+    }
+
+    @Test
+    void preflightFromUnknownOriginIsRejected() throws Exception {
+        mockMvc.perform(options("/categories")
+                        .header(HttpHeaders.ORIGIN, "https://evil.example.com")
+                        .header(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD, "POST"))
+                .andExpect(status().isForbidden())
+                .andExpect(header().doesNotExist(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN));
+    }
+
+    @Test
+    void errorResponsesCarryCorsHeadersForAllowedOrigin() throws Exception {
+        // Without them the browser hides the 401 from the frontend, which then can't refresh the token
+        mockMvc.perform(get("/categories").header(HttpHeaders.ORIGIN, ALLOWED_ORIGIN))
+                .andExpect(status().isUnauthorized())
+                .andExpect(header().string(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN, ALLOWED_ORIGIN));
     }
 
     private static String encode(JwtEncoder encoder, Instant expiresAt) {

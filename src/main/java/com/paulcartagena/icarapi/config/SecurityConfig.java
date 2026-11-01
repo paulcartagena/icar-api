@@ -4,6 +4,7 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.security.config.Customizer;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -17,18 +18,23 @@ import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter;
+import org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter;
 import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.access.AccessDeniedHandler;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import org.springframework.web.servlet.HandlerExceptionResolver;
 
 import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 
 @Configuration
 @EnableMethodSecurity
-@EnableConfigurationProperties({JwtProperties.class, AuthProperties.class})
+@EnableConfigurationProperties({JwtProperties.class, AuthProperties.class, CorsProperties.class})
 public class SecurityConfig {
 
     private final HandlerExceptionResolver exceptionResolver;
@@ -40,7 +46,7 @@ public class SecurityConfig {
     }
 
     @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+    public SecurityFilterChain securityFilterChain(HttpSecurity http, AuthProperties authProperties) throws Exception {
         AuthenticationEntryPoint entryPoint = (request, response, ex) ->
                 exceptionResolver.resolveException(request, response, null, ex);
         AccessDeniedHandler accessDeniedHandler = (request, response, ex) ->
@@ -50,12 +56,15 @@ public class SecurityConfig {
                 // Stateless API: the access token travels in the Authorization header, so there is no session
                 // cookie to protect against CSRF. The refresh cookie is covered by SameSite=Strict.
                 .csrf(csrf -> csrf.disable())
+                // Uses the corsConfigurationSource bean below; answers preflight requests before authentication
+                .cors(Customizer.withDefaults())
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         // logout is public too: the access token may already be expired when the user logs out
                         .requestMatchers(HttpMethod.POST, "/auth/login", "/auth/refresh", "/auth/logout").permitAll()
                         .requestMatchers(HttpMethod.GET, "/public/**").permitAll()
                         .requestMatchers("/scalar/**", "/v3/api-docs/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/actuator/health").permitAll()
                         // Spring forwards errors (e.g. 404) to /error; without this they would turn into 401
                         .requestMatchers("/error").permitAll()
                         .anyRequest().authenticated())
@@ -65,9 +74,29 @@ public class SecurityConfig {
                         .accessDeniedHandler(accessDeniedHandler))
                 .exceptionHandling(ex -> ex
                         .authenticationEntryPoint(entryPoint)
-                        .accessDeniedHandler(accessDeniedHandler));
+                        .accessDeniedHandler(accessDeniedHandler))
+                // Not a bean on purpose: Spring Boot would also register it as a servlet filter outside this chain
+                .addFilterBefore(new LoginRateLimitFilter(authProperties.loginRateLimit(), exceptionResolver),
+                        BearerTokenAuthenticationFilter.class);
 
         return http.build();
+    }
+
+    // The admin panel sends the refresh cookie to /auth, so credentials must be allowed;
+    // that's also why origins are listed explicitly (the browser rejects "*" with credentials)
+    @Bean
+    public CorsConfigurationSource corsConfigurationSource(CorsProperties corsProperties) {
+        CorsConfiguration configuration = new CorsConfiguration();
+        configuration.setAllowedOrigins(corsProperties.allowedOrigins());
+        configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE"));
+        configuration.setAllowedHeaders(List.of("Authorization", "Content-Type"));
+        // Lets the frontend read when to retry after a 429 from the login rate limit
+        configuration.setExposedHeaders(List.of("Retry-After"));
+        configuration.setAllowCredentials(true);
+
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/**", configuration);
+        return source;
     }
 
     @Bean
