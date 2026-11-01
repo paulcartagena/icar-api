@@ -12,7 +12,7 @@ para el sitio web.
 
 ## Stack
 
-Java 21 · Spring Boot 4 · PostgreSQL · Flyway
+Java 21 · Spring Boot 4 · PostgreSQL · Flyway · Docker · GitHub Actions
 
 ## Correr en local
 
@@ -40,9 +40,18 @@ La API queda en http://localhost:8080, con la documentación en `/scalar` y el h
 | `ADMIN_USERNAME`, `ADMIN_PASSWORD`, `ADMIN_FULL_NAME` | Primer admin, solo si no existe ninguno |
 | `CORS_ALLOWED_ORIGINS` | Frontends permitidos, separados por coma (por defecto `localhost:3000` y `5173`) |
 | `PORT` | Puerto del servidor (por defecto `8080`) |
+| `API_DOCS_ENABLED` | Abre `/scalar` y `/v3/api-docs` (por defecto abiertos en `dev` y cerrados en `prod`) |
 
 ## Tests
 
 ```bash
 ./mvnw test
 ```
+
+`contextLoads` arranca la app completa, así que necesita una BD y las variables de arriba.
+
+## CI y deploy
+
+Cada PR y cada push a `main` corre los tests contra un Postgres de GitHub Actions y construye la imagen Docker;
+en `main` además la publica en `ghcr.io/paulcartagena/icar-api` y la despliega en AWS (EC2 + RDS). La guía para
+montar el servidor está en [`deploy/README.md`](deploy/README.md).
