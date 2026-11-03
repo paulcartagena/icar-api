@@ -18,10 +18,15 @@ import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter;
+import org.springframework.security.oauth2.server.resource.web.BearerTokenResolver;
+import org.springframework.security.oauth2.server.resource.web.DefaultBearerTokenResolver;
 import org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter;
 import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.access.AccessDeniedHandler;
+import org.springframework.security.web.servlet.util.matcher.PathPatternRequestMatcher;
+import org.springframework.security.web.util.matcher.OrRequestMatcher;
+import org.springframework.security.web.util.matcher.RequestMatcher;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
@@ -36,6 +41,21 @@ import java.util.List;
 @EnableMethodSecurity
 @EnableConfigurationProperties({JwtProperties.class, AuthProperties.class, CorsProperties.class})
 public class SecurityConfig {
+
+    private static final PathPatternRequestMatcher.Builder PATHS = PathPatternRequestMatcher.withDefaults();
+
+    // Reachable without a token
+    private static final RequestMatcher PUBLIC_ROUTES = new OrRequestMatcher(
+            // logout is public too: the access token may already be expired when the user logs out
+            PATHS.matcher(HttpMethod.POST, "/auth/login"),
+            PATHS.matcher(HttpMethod.POST, "/auth/refresh"),
+            PATHS.matcher(HttpMethod.POST, "/auth/logout"),
+            PATHS.matcher(HttpMethod.GET, "/public/**"),
+            PATHS.matcher("/scalar/**"),
+            PATHS.matcher("/v3/api-docs/**"),
+            PATHS.matcher(HttpMethod.GET, "/actuator/health"),
+            // Spring forwards errors (e.g. 404) to /error; without this they would turn into 401
+            PATHS.matcher("/error"));
 
     private final HandlerExceptionResolver exceptionResolver;
 
@@ -60,15 +80,10 @@ public class SecurityConfig {
                 .cors(Customizer.withDefaults())
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-                        // logout is public too: the access token may already be expired when the user logs out
-                        .requestMatchers(HttpMethod.POST, "/auth/login", "/auth/refresh", "/auth/logout").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/public/**").permitAll()
-                        .requestMatchers("/scalar/**", "/v3/api-docs/**").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/actuator/health").permitAll()
-                        // Spring forwards errors (e.g. 404) to /error; without this they would turn into 401
-                        .requestMatchers("/error").permitAll()
+                        .requestMatchers(PUBLIC_ROUTES).permitAll()
                         .anyRequest().authenticated())
                 .oauth2ResourceServer(oauth2 -> oauth2
+                        .bearerTokenResolver(bearerTokenResolver())
                         .jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter()))
                         .authenticationEntryPoint(entryPoint)
                         .accessDeniedHandler(accessDeniedHandler))
@@ -119,6 +134,13 @@ public class SecurityConfig {
         return NimbusJwtDecoder.withSecretKey(jwtSecretKey)
                 .macAlgorithm(MacAlgorithm.HS256)
                 .build();
+    }
+
+    // Public routes ignore the Authorization header. Otherwise an expired or invalid token sent along (e.g. by the
+    // panel when refreshing, or by Scalar on login) would be rejected with 401 before reaching the endpoint.
+    private BearerTokenResolver bearerTokenResolver() {
+        DefaultBearerTokenResolver defaultResolver = new DefaultBearerTokenResolver();
+        return request -> PUBLIC_ROUTES.matches(request) ? null : defaultResolver.resolve(request);
     }
 
     // Authorities come from the token's "permissions" claim as-is (e.g. FINANCE_WRITE), so controllers use

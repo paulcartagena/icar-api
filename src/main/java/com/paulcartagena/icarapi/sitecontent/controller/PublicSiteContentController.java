@@ -3,6 +3,7 @@ package com.paulcartagena.icarapi.sitecontent.controller;
 import com.paulcartagena.icarapi.sitecontent.dto.AboutUsResponse;
 import com.paulcartagena.icarapi.sitecontent.dto.ContactInfoResponse;
 import com.paulcartagena.icarapi.sitecontent.service.SiteContentService;
+import io.swagger.v3.oas.annotations.security.SecurityRequirements;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -13,6 +14,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/public")
 @Tag(name = "Public")
+@SecurityRequirements
 public class PublicSiteContentController {
 
     private final SiteContentService siteContentService;

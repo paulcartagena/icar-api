@@ -2,6 +2,7 @@ package com.paulcartagena.icarapi.event.controller;
 
 import com.paulcartagena.icarapi.event.dto.EventResponse;
 import com.paulcartagena.icarapi.event.service.EventService;
+import io.swagger.v3.oas.annotations.security.SecurityRequirements;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -15,6 +16,7 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/public/events")
 @Tag(name = "Public")
+@SecurityRequirements
 public class PublicEventController {
 
     private final EventService eventService;

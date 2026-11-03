@@ -2,6 +2,7 @@ package com.paulcartagena.icarapi.ministry.controller;
 
 import com.paulcartagena.icarapi.ministry.dto.PublicMinistryResponse;
 import com.paulcartagena.icarapi.ministry.service.MinistryService;
+import io.swagger.v3.oas.annotations.security.SecurityRequirements;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -17,6 +18,7 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/public/ministries")
 @Tag(name = "Public")
+@SecurityRequirements
 public class PublicMinistryController {
 
     private final MinistryService ministryService;
