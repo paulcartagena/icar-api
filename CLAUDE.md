@@ -44,7 +44,9 @@ lives in the Obsidian vault, not this repo.
   `permissions` claim maps 1:1 to authorities, so endpoints use `@PreAuthorize("hasAuthority('<Permission>')")` on
   every controller method — check permissions, never roles. Each `UserRole` declares its `Permission` set and a
   level (ADMIN > PASTOR > TREASURER). Public routes: `POST /auth/login|refresh|logout`, `GET /public/**`,
-  `GET /actuator/health` (the only Actuator endpoint exposed), the Scalar docs and `/error`. CORS origins come from
+  `GET /actuator/health` (the only Actuator endpoint exposed), the Scalar docs and `/error`. Public routes (`PUBLIC_ROUTES` in `SecurityConfig`) ignore the `Authorization` header, so a stale token sent
+  along (e.g. on refresh) doesn't turn them into 401. The OpenAPI docs declare a `bearerAuth` scheme required by
+  default (`OpenApiConfig`); public endpoints opt out with an empty `@SecurityRequirements`. CORS origins come from
   `CORS_ALLOWED_ORIGINS` (`CorsProperties`, defaults to local dev ports) with credentials allowed, so they must be
   listed explicitly. The current user's id is the JWT `sub` (`@AuthenticationPrincipal Jwt jwt`); use it for
   `registeredBy`, never a request field.

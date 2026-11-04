@@ -107,6 +107,41 @@ class AuthControllerTest {
     }
 
     @Test
+    void loginIgnoresAnInvalidAccessToken() throws Exception {
+        when(authService.login(any(LoginRequest.class)))
+                .thenReturn(new AuthTokens("access-token", 900, "refresh-token"));
+
+        mockMvc.perform(post("/auth/login")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer not-a-jwt")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"username": "paul", "password": "a-strong-password"}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.accessToken").value("access-token"));
+    }
+
+    @Test
+    void refreshIgnoresAnExpiredAccessToken() throws Exception {
+        // The panel may still send the expired access token when it refreshes
+        when(authService.refresh("old-refresh-token"))
+                .thenReturn(new AuthTokens("new-access-token", 900, "new-refresh-token"));
+
+        mockMvc.perform(post("/auth/refresh")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer not-a-jwt")
+                        .cookie(new Cookie("refresh_token", "old-refresh-token")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.accessToken").value("new-access-token"));
+    }
+
+    @Test
+    void meRejectsAnInvalidAccessToken() throws Exception {
+        mockMvc.perform(get("/auth/me").header(HttpHeaders.AUTHORIZATION, "Bearer not-a-jwt"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.message").value("Invalid or expired access token."));
+    }
+
+    @Test
     void meRequiresAnAccessToken() throws Exception {
         mockMvc.perform(get("/auth/me"))
                 .andExpect(status().isUnauthorized());

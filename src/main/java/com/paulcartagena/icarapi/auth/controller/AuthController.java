@@ -6,6 +6,7 @@ import com.paulcartagena.icarapi.auth.dto.MeResponse;
 import com.paulcartagena.icarapi.auth.service.AuthService;
 import com.paulcartagena.icarapi.auth.service.AuthTokens;
 import com.paulcartagena.icarapi.config.AuthProperties;
+import io.swagger.v3.oas.annotations.security.SecurityRequirements;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpHeaders;
@@ -33,17 +34,20 @@ public class AuthController {
         this.authProperties = authProperties;
     }
 
+    @SecurityRequirements
     @PostMapping("/login")
     public ResponseEntity<AccessTokenResponse> login(@Valid @RequestBody LoginRequest loginRequest) {
         return withRefreshCookie(authService.login(loginRequest));
     }
 
+    @SecurityRequirements
     @PostMapping("/refresh")
     public ResponseEntity<AccessTokenResponse> refresh(
             @CookieValue(name = REFRESH_COOKIE, required = false) String refreshToken) {
         return withRefreshCookie(authService.refresh(refreshToken));
     }
 
+    @SecurityRequirements
     @PostMapping("/logout")
     public ResponseEntity<Void> logout(@CookieValue(name = REFRESH_COOKIE, required = false) String refreshToken) {
         authService.logout(refreshToken);
