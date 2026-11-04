@@ -39,18 +39,24 @@ import java.util.List;
 
 @Configuration
 @EnableMethodSecurity
-@EnableConfigurationProperties({JwtProperties.class, AuthProperties.class, CorsProperties.class})
+@EnableConfigurationProperties({JwtProperties.class, AuthProperties.class, CorsProperties.class,
+        VisitRequestProperties.class})
 public class SecurityConfig {
 
     private static final PathPatternRequestMatcher.Builder PATHS = PathPatternRequestMatcher.withDefaults();
 
+    private static final RequestMatcher LOGIN = PATHS.matcher(HttpMethod.POST, "/auth/login");
+    private static final RequestMatcher NEW_VISIT_REQUEST = PATHS.matcher(HttpMethod.POST, "/public/visit-requests");
+
     // Reachable without a token
     private static final RequestMatcher PUBLIC_ROUTES = new OrRequestMatcher(
             // logout is public too: the access token may already be expired when the user logs out
-            PATHS.matcher(HttpMethod.POST, "/auth/login"),
+            LOGIN,
             PATHS.matcher(HttpMethod.POST, "/auth/refresh"),
             PATHS.matcher(HttpMethod.POST, "/auth/logout"),
             PATHS.matcher(HttpMethod.GET, "/public/**"),
+            // The "Planea tu visita" form of the public website (rate limited below)
+            NEW_VISIT_REQUEST,
             PATHS.matcher("/scalar/**"),
             PATHS.matcher("/v3/api-docs/**"),
             PATHS.matcher(HttpMethod.GET, "/actuator/health"),
@@ -66,7 +72,8 @@ public class SecurityConfig {
     }
 
     @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http, AuthProperties authProperties) throws Exception {
+    public SecurityFilterChain securityFilterChain(HttpSecurity http, AuthProperties authProperties,
+                                                   VisitRequestProperties visitRequestProperties) throws Exception {
         AuthenticationEntryPoint entryPoint = (request, response, ex) ->
                 exceptionResolver.resolveException(request, response, null, ex);
         AccessDeniedHandler accessDeniedHandler = (request, response, ex) ->
@@ -90,8 +97,16 @@ public class SecurityConfig {
                 .exceptionHandling(ex -> ex
                         .authenticationEntryPoint(entryPoint)
                         .accessDeniedHandler(accessDeniedHandler))
-                // Not a bean on purpose: Spring Boot would also register it as a servlet filter outside this chain
-                .addFilterBefore(new LoginRateLimitFilter(authProperties.loginRateLimit(), exceptionResolver),
+                // Not beans on purpose: Spring Boot would also register them as servlet filters outside this chain
+                .addFilterBefore(new RateLimitFilter(LOGIN,
+                                authProperties.loginRateLimit().capacity(),
+                                authProperties.loginRateLimit().refillPeriod(),
+                                "Too many login attempts. Try again later.", exceptionResolver),
+                        BearerTokenAuthenticationFilter.class)
+                .addFilterBefore(new RateLimitFilter(NEW_VISIT_REQUEST,
+                                visitRequestProperties.rateLimit().capacity(),
+                                visitRequestProperties.rateLimit().refillPeriod(),
+                                "Too many visit requests. Try again later.", exceptionResolver),
                         BearerTokenAuthenticationFilter.class);
 
         return http.build();
@@ -105,7 +120,7 @@ public class SecurityConfig {
         configuration.setAllowedOrigins(corsProperties.allowedOrigins());
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE"));
         configuration.setAllowedHeaders(List.of("Authorization", "Content-Type"));
-        // Lets the frontend read when to retry after a 429 from the login rate limit
+        // Lets the frontend read when to retry after a 429 from a rate limit (login, visit requests)
         configuration.setExposedHeaders(List.of("Retry-After"));
         configuration.setAllowCredentials(true);
 

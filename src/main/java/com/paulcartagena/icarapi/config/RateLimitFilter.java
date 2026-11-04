@@ -8,45 +8,56 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.http.HttpHeaders;
+import org.springframework.security.web.util.matcher.RequestMatcher;
 import org.springframework.web.filter.OncePerRequestFilter;
 import org.springframework.web.servlet.HandlerExceptionResolver;
 
 import java.io.IOException;
+import java.time.Duration;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 
 /**
- * Limits {@code POST /auth/login} attempts per client IP against brute force and credential stuffing.
+ * Limits the requests that match {@code matcher} per client IP: {@code POST /auth/login} against brute force and
+ * credential stuffing, and the public forms against spam. Each instance keeps its own buckets.
  * <p>
  * The buckets live in memory, so the limit is per instance: with more than one instance it would need a shared
  * store (e.g. Bucket4j + Redis).
  */
-class LoginRateLimitFilter extends OncePerRequestFilter {
+class RateLimitFilter extends OncePerRequestFilter {
 
-    // Past this many tracked IPs, buckets that are full again (no recent attempts) are dropped,
+    // Past this many tracked IPs, buckets that are full again (no recent requests) are dropped,
     // so requests from many different IPs can't grow the map without limit
     private static final int MAX_TRACKED_CLIENTS = 10_000;
 
     private final Map<String, Bucket> buckets = new ConcurrentHashMap<>();
-    private final AuthProperties.LoginRateLimit limit;
+    private final RequestMatcher matcher;
+    private final int capacity;
+    private final Duration refillPeriod;
+    private final String message;
     private final HandlerExceptionResolver exceptionResolver;
 
-    LoginRateLimitFilter(AuthProperties.LoginRateLimit limit, HandlerExceptionResolver exceptionResolver) {
-        this.limit = limit;
+    // Each client IP gets `capacity` requests, refilled gradually over `refillPeriod`
+    RateLimitFilter(RequestMatcher matcher, int capacity, Duration refillPeriod, String message,
+                    HandlerExceptionResolver exceptionResolver) {
+        this.matcher = matcher;
+        this.capacity = capacity;
+        this.refillPeriod = refillPeriod;
+        this.message = message;
         this.exceptionResolver = exceptionResolver;
     }
 
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
-        return !("POST".equals(request.getMethod()) && "/auth/login".equals(request.getRequestURI()));
+        return !matcher.matches(request);
     }
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
             throws ServletException, IOException {
         if (buckets.size() > MAX_TRACKED_CLIENTS) {
-            buckets.values().removeIf(bucket -> bucket.getAvailableTokens() == limit.capacity());
+            buckets.values().removeIf(bucket -> bucket.getAvailableTokens() == capacity);
         }
 
         // Behind a proxy, Tomcat already resolves the real client IP from X-Forwarded-For
@@ -62,15 +73,14 @@ class LoginRateLimitFilter extends OncePerRequestFilter {
 
         long retryAfterSeconds = Math.max(1, TimeUnit.NANOSECONDS.toSeconds(probe.getNanosToWaitForRefill()) + 1);
         response.setHeader(HttpHeaders.RETRY_AFTER, String.valueOf(retryAfterSeconds));
-        exceptionResolver.resolveException(request, response, null,
-                ApiException.tooManyRequests("Too many login attempts. Try again later."));
+        exceptionResolver.resolveException(request, response, null, ApiException.tooManyRequests(message));
     }
 
     private Bucket newBucket() {
         return Bucket.builder()
                 .addLimit(bandwidth -> bandwidth
-                        .capacity(limit.capacity())
-                        .refillGreedy(limit.capacity(), limit.refillPeriod()))
+                        .capacity(capacity)
+                        .refillGreedy(capacity, refillPeriod))
                 .build();
     }
 }
