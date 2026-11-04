@@ -9,6 +9,9 @@ import com.paulcartagena.icarapi.ministry.controller.PublicMinistryController;
 import com.paulcartagena.icarapi.ministry.service.MinistryService;
 import com.paulcartagena.icarapi.user.enums.Permission;
 import com.paulcartagena.icarapi.user.enums.UserRole;
+import com.paulcartagena.icarapi.visitrequest.controller.PublicVisitRequestController;
+import com.paulcartagena.icarapi.visitrequest.controller.VisitRequestController;
+import com.paulcartagena.icarapi.visitrequest.service.VisitRequestService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
@@ -37,10 +40,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 // Checks every membership endpoint against the permission it requires, using each role's real permission set,
-// and that the public ministries need no token
+// and that the public ministries and the visit request form need no token
 @WebMvcTest(
         controllers = {MemberController.class, FamilyController.class, MinistryController.class,
-                PublicMinistryController.class},
+                PublicMinistryController.class, VisitRequestController.class, PublicVisitRequestController.class},
         properties = "jwt.secret=test-secret-with-at-least-32-characters!!"
 )
 @Import(SecurityConfig.class)
@@ -61,6 +64,8 @@ class MembershipPermissionsTest {
             {"memberId": "%s"}""".formatted(ID);
     private static final String SCHEDULE = """
             {"dayOfWeek": "SUNDAY", "startTime": "10:00"}""";
+    private static final String VISIT_REQUEST = """
+            {"fullName": "Ana Pérez", "phone": "60000000", "email": "ana@example.com"}""";
 
     @Autowired
     private MockMvc mockMvc;
@@ -73,6 +78,9 @@ class MembershipPermissionsTest {
 
     @MockitoBean
     private MinistryService ministryService;
+
+    @MockitoBean
+    private VisitRequestService visitRequestService;
 
     static Stream<Arguments> endpoints() {
         return Stream.of(
@@ -97,7 +105,10 @@ class MembershipPermissionsTest {
                 endpoint(HttpMethod.DELETE, "/ministries/" + ID + "/members/" + OTHER_ID, null, Permission.MEMBERS_WRITE),
                 endpoint(HttpMethod.POST, "/ministries/" + ID + "/schedules", SCHEDULE, Permission.MEMBERS_WRITE),
                 endpoint(HttpMethod.PUT, "/ministries/" + ID + "/schedules/" + OTHER_ID, SCHEDULE, Permission.MEMBERS_WRITE),
-                endpoint(HttpMethod.DELETE, "/ministries/" + ID + "/schedules/" + OTHER_ID, null, Permission.MEMBERS_WRITE)
+                endpoint(HttpMethod.DELETE, "/ministries/" + ID + "/schedules/" + OTHER_ID, null, Permission.MEMBERS_WRITE),
+
+                endpoint(HttpMethod.GET, "/visit-requests", null, Permission.MEMBERS_READ),
+                endpoint(HttpMethod.GET, "/visit-requests/" + ID, null, Permission.MEMBERS_READ)
         );
     }
 
@@ -156,6 +167,32 @@ class MembershipPermissionsTest {
     void publicMinistriesNeedNoToken() throws Exception {
         mockMvc.perform(get("/public/ministries")).andExpect(status().isOk());
         mockMvc.perform(get("/public/ministries/" + ID)).andExpect(status().isOk());
+    }
+
+    @Test
+    void visitRequestFormNeedsNoToken() throws Exception {
+        mockMvc.perform(post("/public/visit-requests").contentType(MediaType.APPLICATION_JSON).content(VISIT_REQUEST))
+                .andExpect(status().isCreated());
+    }
+
+    @Test
+    void visitRequestFormIgnoresAStaleToken() throws Exception {
+        mockMvc.perform(post("/public/visit-requests")
+                        .header("Authorization", "Bearer not-a-valid-token")
+                        .contentType(MediaType.APPLICATION_JSON).content(VISIT_REQUEST))
+                .andExpect(status().isCreated());
+    }
+
+    @Test
+    void invalidVisitRequestReturns400() throws Exception {
+        mockMvc.perform(post("/public/visit-requests").contentType(MediaType.APPLICATION_JSON).content("""
+                        {"fullName": "Ana Pérez", "phone": "60000000", "email": "not-an-email"}"""))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void adminVisitRequestsWithoutTokenReturn401() throws Exception {
+        mockMvc.perform(get("/visit-requests")).andExpect(status().isUnauthorized());
     }
 
     @Test

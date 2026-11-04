@@ -8,8 +8,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 membership, site content) plus public read endpoints for a companion public website. The domain model is built out:
 JPA entities exist for the financial cluster (`AppUser`, `Category`, `Donation`, `Income`, `Expense`, `Budget`),
 membership cluster (`Member`, `Family`, `Ministry`, `ServiceSchedule`, `MemberMinistry`), events
-(`Event`, `EventPhoto`), and site content (`AboutUs`, `ContactInfo`), backed by Flyway migrations in
-`src/main/resources/db/migration` (`V1`-`V16`) and a Postgres datasource configured per-profile (`dev`/`prod`) in
+(`Event`, `EventPhoto`), site content (`AboutUs`, `ContactInfo`) and visit requests (`VisitRequest`), backed by
+Flyway migrations in `src/main/resources/db/migration` (`V1`-`V17`) and a Postgres datasource configured per-profile (`dev`/`prod`) in
 `application.yaml` via env vars (`hibernate.ddl-auto: validate`, so entities and migrations must stay in sync).
 Every entity has a Spring Data repository. The modules with a controller/service layer so far are `category`
 (list, create, update name, activate/deactivate) and `expense` (list with optional `categoryId` and `from`/`to`
@@ -26,7 +26,8 @@ assign and remove members and `/ministries/{id}/schedules` to add, update and de
 `event` (admin `/events`: list with optional `active` and `from`/`to` overlap filters, get by id, create, update,
 activate/deactivate, delete, and `/events/{id}/photos` to add, update and delete photos; public `GET /public/events`
 and `/public/events/{id}`) and `sitecontent` (`PUT /site-content/about-us|contact-info` and their public
-`GET /public/about-us|contact-info`). Do not assume any controllers/services exist beyond what's actually in `src/`; the ERD
+`GET /public/about-us|contact-info`), plus `visitrequest` (public `POST /public/visit-requests` for the "Planea tu
+visita" form, and admin `GET /visit-requests` newest first and `/visit-requests/{id}`). Do not assume any controllers/services exist beyond what's actually in `src/`; the ERD
 lives in the Obsidian vault, not this repo.
 
 ## Conventions
@@ -44,7 +45,8 @@ lives in the Obsidian vault, not this repo.
   `permissions` claim maps 1:1 to authorities, so endpoints use `@PreAuthorize("hasAuthority('<Permission>')")` on
   every controller method — check permissions, never roles. Each `UserRole` declares its `Permission` set and a
   level (ADMIN > PASTOR > TREASURER). Public routes: `POST /auth/login|refresh|logout`, `GET /public/**`,
-  `GET /actuator/health` (the only Actuator endpoint exposed), the Scalar docs and `/error`. Public routes (`PUBLIC_ROUTES` in `SecurityConfig`) ignore the `Authorization` header, so a stale token sent
+  `POST /public/visit-requests`, `GET /actuator/health` (the only Actuator endpoint exposed), the Scalar docs and
+  `/error`. Public routes (`PUBLIC_ROUTES` in `SecurityConfig`) ignore the `Authorization` header, so a stale token sent
   along (e.g. on refresh) doesn't turn them into 401. The OpenAPI docs declare a `bearerAuth` scheme required by
   default (`OpenApiConfig`); public endpoints opt out with an empty `@SecurityRequirements`. CORS origins come from
   `CORS_ALLOWED_ORIGINS` (`CorsProperties`, defaults to local dev ports) with credentials allowed, so they must be
@@ -54,11 +56,11 @@ lives in the Obsidian vault, not this repo.
   in an `HttpOnly; SameSite=Strict; Path=/auth` cookie, rotated on every refresh; reusing a revoked one revokes all
   the user's sessions. The first ADMIN is created at startup by `InitialAdminCreator` from `ADMIN_USERNAME` /
   `ADMIN_PASSWORD` when none exists. Passwords are BCrypt, 12-72 characters. `POST /auth/login` is rate limited per
-  client IP (`LoginRateLimitFilter`, Bucket4j in memory, `auth.login-rate-limit.*`, 5 per minute by default): over
+  client IP (`RateLimitFilter`, Bucket4j in memory, `auth.login-rate-limit.*`, 5 per minute by default): over
   the limit it answers 429 (`ApiException.tooManyRequests`) with `Retry-After`. The IP is `getRemoteAddr()`, which
   `server.forward-headers-strategy: native` resolves from `X-Forwarded-For` only for private-network proxies; never
-  read that header directly. The filter is created inside `SecurityConfig`, not as a bean, so it isn't also
-  registered as a servlet filter.
+  read that header directly. Each `RateLimitFilter` instance (one per limited route, with its own buckets) is created
+  inside `SecurityConfig`, not as a bean, so it isn't also registered as a servlet filter.
 - User rules: users are deactivated, never deleted; status is only `ACTIVE`/`INACTIVE` (`V11`). Anti-escalation:
   an actor can only manage users and assign roles below their own level unless they have `USERS_ADMIN`; nobody
   edits, deactivates or resets the password of their own account through `/users/{id}` (use `/users/me/password`).
@@ -105,6 +107,10 @@ lives in the Obsidian vault, not this repo.
 - Site content rules: `AboutUs` and `ContactInfo` are single records (`V16` unique index on `(true)`): `PUT` under
   `/site-content` (`CONTENT_WRITE`) creates them the first time and updates them afterwards; there are no admin GETs
   (the panel reads the public ones). Public GETs answer 404 until configured. All fields are required and trimmed.
+- Visit request rules: sent from the public website without a token (full name, phone and email required and
+  trimmed, blank message stored as null; `V17`), rate limited per client IP like the login (`RateLimitFilter`,
+  `visit-requests.rate-limit.*`, 5 per hour by default). They hold personal data for pastoral follow-up, so the admin
+  reads use `MEMBERS_READ`. There is no update/delete or follow-up status yet.
 - Never edit an already-applied Flyway migration; add a new `V<n>` file instead.
 
 ## Build, run, test
