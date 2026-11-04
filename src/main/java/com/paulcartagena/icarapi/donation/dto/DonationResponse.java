@@ -7,7 +7,8 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
-// incomeId/categoryId/categoryName are null while the donation has no income (e.g. a future pending PayPal one)
+// incomeId/categoryId/categoryName are null while the donation has no income (a PENDING or FAILED PayPal one);
+// the paypal* fields and payerEmail are only set for PayPal donations
 public record DonationResponse(
         UUID id,
         String donorName,
@@ -16,6 +17,9 @@ public record DonationResponse(
         DonationMethod method,
         DonationStatus status,
         LocalDateTime completedAt,
+        String paypalOrderId,
+        String paypalCaptureId,
+        String payerEmail,
         UUID incomeId,
         UUID categoryId,
         String categoryName,

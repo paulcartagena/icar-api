@@ -40,13 +40,14 @@ import java.util.List;
 @Configuration
 @EnableMethodSecurity
 @EnableConfigurationProperties({JwtProperties.class, AuthProperties.class, CorsProperties.class,
-        VisitRequestProperties.class})
+        VisitRequestProperties.class, PayPalProperties.class})
 public class SecurityConfig {
 
     private static final PathPatternRequestMatcher.Builder PATHS = PathPatternRequestMatcher.withDefaults();
 
     private static final RequestMatcher LOGIN = PATHS.matcher(HttpMethod.POST, "/auth/login");
     private static final RequestMatcher NEW_VISIT_REQUEST = PATHS.matcher(HttpMethod.POST, "/public/visit-requests");
+    private static final RequestMatcher NEW_PAYPAL_ORDER = PATHS.matcher(HttpMethod.POST, "/public/donations/paypal/orders");
 
     // Reachable without a token
     private static final RequestMatcher PUBLIC_ROUTES = new OrRequestMatcher(
@@ -57,6 +58,8 @@ public class SecurityConfig {
             PATHS.matcher(HttpMethod.GET, "/public/**"),
             // The "Planea tu visita" form of the public website (rate limited below)
             NEW_VISIT_REQUEST,
+            // PayPal checkout (create and capture orders) and PayPal's webhook, which verifies its own signature
+            PATHS.matcher(HttpMethod.POST, "/public/donations/paypal/**"),
             PATHS.matcher("/scalar/**"),
             PATHS.matcher("/v3/api-docs/**"),
             PATHS.matcher(HttpMethod.GET, "/actuator/health"),
@@ -73,7 +76,8 @@ public class SecurityConfig {
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http, AuthProperties authProperties,
-                                                   VisitRequestProperties visitRequestProperties) throws Exception {
+                                                   VisitRequestProperties visitRequestProperties,
+                                                   PayPalProperties payPalProperties) throws Exception {
         AuthenticationEntryPoint entryPoint = (request, response, ex) ->
                 exceptionResolver.resolveException(request, response, null, ex);
         AccessDeniedHandler accessDeniedHandler = (request, response, ex) ->
@@ -107,6 +111,11 @@ public class SecurityConfig {
                                 visitRequestProperties.rateLimit().capacity(),
                                 visitRequestProperties.rateLimit().refillPeriod(),
                                 "Too many visit requests. Try again later.", exceptionResolver),
+                        BearerTokenAuthenticationFilter.class)
+                .addFilterBefore(new RateLimitFilter(NEW_PAYPAL_ORDER,
+                                payPalProperties.orderRateLimit().capacity(),
+                                payPalProperties.orderRateLimit().refillPeriod(),
+                                "Too many donation attempts. Try again later.", exceptionResolver),
                         BearerTokenAuthenticationFilter.class);
 
         return http.build();
@@ -120,7 +129,7 @@ public class SecurityConfig {
         configuration.setAllowedOrigins(corsProperties.allowedOrigins());
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE"));
         configuration.setAllowedHeaders(List.of("Authorization", "Content-Type"));
-        // Lets the frontend read when to retry after a 429 from a rate limit (login, visit requests)
+        // Lets the frontend read when to retry after a 429 from a rate limit (login, visit requests, PayPal orders)
         configuration.setExposedHeaders(List.of("Retry-After"));
         configuration.setAllowCredentials(true);
 

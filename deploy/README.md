@@ -122,6 +122,7 @@ nano ~/icar/.env
 | `ADMIN_FULL_NAME` | opcional, el nombre que se muestra |
 | `CORS_ALLOWED_ORIGINS` | déjalo como está hasta que el panel o el sitio tengan URL de producción |
 | `API_DOCS_ENABLED` | `false`; ponlo en `true` solo mientras necesites `/scalar` (paso 7) |
+| `PAYPAL_*` | vacías hasta configurar las donaciones online (paso 9) |
 
 Guarda con `Ctrl+O`, `Enter`, y sal con `Ctrl+X`.
 
@@ -168,6 +169,37 @@ Desde ahí, cada merge a `main` corre los tests, publica la imagen y reinicia la
 - **CORS:** por ahora acepta `localhost:3000` y `localhost:5173`. Cuando el panel o el sitio tengan URL de producción, agrégalas en `CORS_ALLOWED_ORIGINS` (separadas por comas) y reinicia con `docker compose up -d`.
 - ⚠️ **Cookie del refresh token:** es `SameSite=Strict`, así que el navegador solo la manda si el panel y la API están en el **mismo sitio** (por ejemplo `admin.icar.org` y `api.icar.org`). Con dominios distintos (por ejemplo `vercel.app` y `sslip.io`), el refresh no funciona: usa un proxy desde el frontend (`rewrites` de Next.js / Vercel) para que el navegador vea la API en el mismo dominio, o compra un dominio para ambos.
 - **Sitio público:** `GET /public/**` no necesita token.
+
+### Donaciones online (PayPal)
+
+1. En [developer.paypal.com](https://developer.paypal.com) → **Apps & Credentials** → **Sandbox**, crea una app y copia
+   el **Client ID** y el **Secret** en `PAYPAL_CLIENT_ID` / `PAYPAL_CLIENT_SECRET`.
+2. En esa app, **Add Webhook** con la URL `https://<API_DOMAIN>/public/donations/paypal/webhook` y los eventos
+   `Payment capture completed` y `Payment capture denied`. Copia su **Webhook ID** en `PAYPAL_WEBHOOK_ID`.
+3. Reinicia con `docker compose up -d`. Al arrancar se crea la categoría de ingreso **Donaciones online**.
+4. En el sitio, carga el JS SDK con el `clientId` de `GET /public/donations/paypal/config` (también trae la moneda,
+   el mínimo, el máximo y los montos sugeridos) y usa los botones así:
+   ```js
+   paypal.Buttons({
+     createOrder: async () => {
+       const res = await fetch(`${API}/public/donations/paypal/orders`, {
+         method: "POST", headers: { "Content-Type": "application/json" },
+         body: JSON.stringify({ amount, donorName, message }),
+       });
+       return (await res.json()).orderId;
+     },
+     onApprove: async ({ orderID }, actions) => {
+       const res = await fetch(`${API}/public/donations/paypal/orders/${orderID}/capture`, { method: "POST" });
+       if (res.status === 409) return actions.restart(); // tarjeta rechazada: el donante elige otro medio
+       const { status } = await res.json(); // COMPLETED, o PENDING si PayPal lo está revisando
+     },
+   }).render("#paypal-button");
+   ```
+   Prueba con las cuentas de comprador de **Sandbox accounts**.
+5. Para cobrar de verdad, repite los pasos 1 y 2 en **Live** (con la cuenta PayPal Business de la iglesia), cambia
+   las tres variables y pon `PAYPAL_BASE_URL=https://api-m.paypal.com`.
+
+Los reembolsos se hacen en PayPal y luego se anula la donación desde el panel (`PATCH /donations/{id}/void`).
 
 ## 10. Operación del día a día
 

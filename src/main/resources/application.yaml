@@ -34,6 +34,13 @@ admin:
   username: ${ADMIN_USERNAME:}
   password: ${ADMIN_PASSWORD:}
   full-name: ${ADMIN_FULL_NAME:}
+
+# Online donations (see PayPalProperties). Without client id and secret the PayPal endpoints answer 503.
+paypal:
+  client-id: ${PAYPAL_CLIENT_ID:}
+  client-secret: ${PAYPAL_CLIENT_SECRET:}
+  webhook-id: ${PAYPAL_WEBHOOK_ID:}
+  base-url: ${PAYPAL_BASE_URL:https://api-m.sandbox.paypal.com}
 ---
 spring:
   config:
