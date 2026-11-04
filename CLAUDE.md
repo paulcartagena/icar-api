@@ -9,7 +9,7 @@ membership, site content) plus public read endpoints for a companion public webs
 JPA entities exist for the financial cluster (`AppUser`, `Category`, `Donation`, `Income`, `Expense`, `Budget`),
 membership cluster (`Member`, `Family`, `Ministry`, `ServiceSchedule`, `MemberMinistry`), events
 (`Event`, `EventPhoto`), site content (`AboutUs`, `ContactInfo`) and visit requests (`VisitRequest`), backed by
-Flyway migrations in `src/main/resources/db/migration` (`V1`-`V17`) and a Postgres datasource configured per-profile (`dev`/`prod`) in
+Flyway migrations in `src/main/resources/db/migration` (`V1`-`V18`) and a Postgres datasource configured per-profile (`dev`/`prod`) in
 `application.yaml` via env vars (`hibernate.ddl-auto: validate`, so entities and migrations must stay in sync).
 Every entity has a Spring Data repository. The modules with a controller/service layer so far are `category`
 (list, create, update name, activate/deactivate) and `expense` (list with optional `categoryId` and `from`/`to`
@@ -17,7 +17,8 @@ date-range filters, get by id, create, update, void, and a `/summary` of totals 
 `from`/`to` period) and `income` (a mirror of `expense` with the same endpoints, minus `receiptUrl`) and `budget` (list with optional
 `categoryId` and `from`/`to` overlap filters, get by id, create, update, delete; every response compares the
 planned amount against the actual totals) and `donation` (list with optional `status`, `method` and `from`/`to`
-filters, get by id, register a cash/transfer donation, void), plus
+filters, get by id, register a cash/transfer donation, void; public PayPal checkout under `/public/donations/paypal`:
+`GET /config`, `POST /orders`, `POST /orders/{orderId}/capture` and PayPal's `POST /webhook`), plus
 `auth` (login, refresh, logout, me) and `user` (user management, own password change), plus the membership cluster:
 `member` (list with optional `status`, `familyId`, `ministryId` and name `search` filters, get by id, create, update),
 `family` (list, get by id, create, update, delete) and `ministry` (CRUD, plus `/ministries/{id}/members` to list,
@@ -37,7 +38,8 @@ lives in the Obsidian vault, not this repo.
   Never expose entities from controllers.
 - Errors: throw `ApiException` via its static factories (`resourceNotFound` -> 404, `badRequest` -> 400,
   `unauthorized` -> 401, `forbidden` -> 403, `duplicateResource` -> 409, `conflict` -> 409 for actions invalid in
-  the current state, `tooManyRequests` -> 429). `exception/GlobalExceptionHandler` (`@RestControllerAdvice`) maps `ApiException`, `@Valid`
+  the current state, `tooManyRequests` -> 429, `badGateway` -> 502 when an external service fails, `serviceUnavailable` ->
+  503 for a feature that isn't configured). `exception/GlobalExceptionHandler` (`@RestControllerAdvice`) maps `ApiException`, `@Valid`
   failures (400), `DataIntegrityViolationException` (409) and Spring Security's `AuthenticationException` (401) /
   `AccessDeniedException` (403) to the `ErrorResponse` record; `config/SecurityConfig` forwards filter-level
   security errors to it through the `HandlerExceptionResolver`.
@@ -45,7 +47,7 @@ lives in the Obsidian vault, not this repo.
   `permissions` claim maps 1:1 to authorities, so endpoints use `@PreAuthorize("hasAuthority('<Permission>')")` on
   every controller method — check permissions, never roles. Each `UserRole` declares its `Permission` set and a
   level (ADMIN > PASTOR > TREASURER). Public routes: `POST /auth/login|refresh|logout`, `GET /public/**`,
-  `POST /public/visit-requests`, `GET /actuator/health` (the only Actuator endpoint exposed), the Scalar docs and
+  `POST /public/visit-requests`, `POST /public/donations/paypal/**`, `GET /actuator/health` (the only Actuator endpoint exposed), the Scalar docs and
   `/error`. Public routes (`PUBLIC_ROUTES` in `SecurityConfig`) ignore the `Authorization` header, so a stale token sent
   along (e.g. on refresh) doesn't turn them into 401. The OpenAPI docs declare a `bearerAuth` scheme required by
   default (`OpenApiConfig`); public endpoints opt out with an empty `@SecurityRequirements`. CORS origins come from
@@ -76,11 +78,24 @@ lives in the Obsidian vault, not this repo.
 - Income follows the same void rules as expenses (`V9` `chk_income_void`). Income categories must be of type
   `INCOME`. `sourceDonation` is read-only in the API (not settable via `IncomeRequest`), and an income linked to a
   donation cannot be updated or voided through `/incomes` (409): it is managed from `/donations`.
-- Donation rules: registering a donation (only `CASH`/`TRANSFER`; `PAYPAL` is reserved for the future checkout flow)
+- Donation rules: registering a donation (only `CASH`/`TRANSFER`; `PAYPAL` ones come from the online checkout)
   creates it as `COMPLETED` (`completedAt` = the given date at 00:00) together with its `Income` (chosen `INCOME`
   category, same amount and date, `sourceDonation` set, `V5` keeps it 1:1) in one transaction. A blank `donorName` is
   stored as "Anónimo". Donations are never edited or deleted: voiding one (`V13` `chk_donation_void`, same rules as
   expenses) voids its income too, so totals and budgets stop counting it.
+- Online donation rules (`OnlineDonationService`, PayPal Orders v2 over plain HTTP in `donation/paypal/PayPalClient`,
+  no SDK; `PayPalProperties`, `paypal.*`): USD only, amount between `min-amount` and `max-amount` (5-5000 by default;
+  `preset-amounts` 5/10/25/50/100 are only for the website's buttons). Creating an order saves a `PAYPAL` donation as
+  `PENDING` with its `paypalOrderId` (no `registeredBy`); creating orders is rate limited per IP
+  (`paypal.order-rate-limit.*`, 10 per hour). Capturing completes it when PayPal reports the capture `COMPLETED` with
+  the same amount and currency (a mismatch is logged and left `PENDING`), sets `paypalCaptureId`/`payerEmail` and
+  creates its `Income` in the "Donaciones online" `INCOME` category (created at startup by
+  `OnlineDonationCategoryCreator` once PayPal is configured, used even if deactivated); `DECLINED`/`FAILED` mark it
+  `FAILED`, a 4xx from PayPal answers 409 and keeps it `PENDING`. The webhook (`PAYMENT.CAPTURE.COMPLETED`/`DENIED`)
+  is trusted only after PayPal's `verify-webhook-signature` with the raw body. Capture and webhook lock the row
+  (`findWithLockByPaypalOrderId`) and only act on `PENDING` donations; `V18` makes the PayPal ids unique. Without
+  `PAYPAL_CLIENT_ID`/`SECRET` (or `PAYPAL_WEBHOOK_ID` for the webhook) the endpoints answer 503. Refunds are done in
+  PayPal and the donation voided from `/donations`.
 - Budget rules: a budget plans an amount for one category (`EXPENSE` or `INCOME`) over `periodStart`-`periodEnd`
   (inclusive; `V12` CHECKs keep the period ordered and the amount positive). A category cannot have two budgets
   with overlapping periods (checked in the service, 409). `actualAmount` is the sum of non-voided expenses or incomes
@@ -152,7 +167,10 @@ changes to the compose file or Caddyfile must be copied to the server by hand.
   its `-test` companion) provides JWT validation and `JwtEncoder`/`JwtDecoder` via Nimbus.
 - Required env vars: the datasource ones per profile, `JWT_SECRET` (at least 32 characters), and `ADMIN_USERNAME` /
   `ADMIN_PASSWORD` (optional `ADMIN_FULL_NAME`) only on the first start against an empty DB. Optional:
-  `CORS_ALLOWED_ORIGINS` (comma-separated, required in production), `PORT` (default 8080) and `API_DOCS_ENABLED`
-  (Scalar and `/v3/api-docs`: open by default, closed in the `prod` profile unless set to `true`).
-- No external service SDKs (payments, cloud storage) are present yet — check `pom.xml` before assuming any of these
-  are available.
+  `CORS_ALLOWED_ORIGINS` (comma-separated, required in production), `PORT` (default 8080), `API_DOCS_ENABLED`
+  (Scalar and `/v3/api-docs`: open by default, closed in the `prod` profile unless set to `true`), and
+  `PAYPAL_CLIENT_ID` / `PAYPAL_CLIENT_SECRET` / `PAYPAL_WEBHOOK_ID` / `PAYPAL_BASE_URL` (sandbox by default) for online
+  donations.
+- No external service SDKs (payments, cloud storage) are present — PayPal is called with Spring's `RestClient`
+  (built in `PayPalClient`: there is no `RestClient.Builder` bean, `spring-boot-restclient` isn't a dependency). Check
+  `pom.xml` before assuming any SDK is available.

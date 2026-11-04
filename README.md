@@ -41,6 +41,9 @@ La API queda en http://localhost:8080, con la documentación en `/scalar` y el h
 | `CORS_ALLOWED_ORIGINS` | Frontends permitidos, separados por coma (por defecto `localhost:3000` y `5173`) |
 | `PORT` | Puerto del servidor (por defecto `8080`) |
 | `API_DOCS_ENABLED` | Abre `/scalar` y `/v3/api-docs` (por defecto abiertos en `dev` y cerrados en `prod`) |
+| `PAYPAL_CLIENT_ID`, `PAYPAL_CLIENT_SECRET` | Credenciales de la app de PayPal para las donaciones online; sin ellas esos endpoints responden 503 |
+| `PAYPAL_WEBHOOK_ID` | Id del webhook de esa app, para verificar las notificaciones de PayPal |
+| `PAYPAL_BASE_URL` | `https://api-m.sandbox.paypal.com` (por defecto) o `https://api-m.paypal.com` en producción |
 
 ## Tests
 

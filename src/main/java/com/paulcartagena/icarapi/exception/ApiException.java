@@ -40,4 +40,14 @@ public class ApiException extends RuntimeException {
     public static ApiException tooManyRequests(String message) {
         return new ApiException(message, HttpStatus.TOO_MANY_REQUESTS);
     }
+
+    // An external service (e.g. PayPal) failed or answered something unexpected
+    public static ApiException badGateway(String message) {
+        return new ApiException(message, HttpStatus.BAD_GATEWAY);
+    }
+
+    // A feature that depends on configuration that isn't set (e.g. PayPal credentials)
+    public static ApiException serviceUnavailable(String message) {
+        return new ApiException(message, HttpStatus.SERVICE_UNAVAILABLE);
+    }
 }

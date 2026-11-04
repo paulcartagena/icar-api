@@ -101,7 +101,7 @@ public class DonationService {
 
     // Registers a donation received in person and its income, in the same transaction
     public DonationResponse createDonation(DonationRequest donationRequest, UUID registeredById) {
-        // PayPal donations will come from the PayPal checkout flow, never typed in by hand
+        // PayPal donations come from the PayPal checkout flow (OnlineDonationService), never typed in by hand
         if (donationRequest.method() == DonationMethod.PAYPAL) {
             throw ApiException.badRequest("PayPal donations cannot be registered manually.");
         }
@@ -199,6 +199,9 @@ public class DonationService {
                 donation.getMethod(),
                 donation.getStatus(),
                 donation.getCompletedAt(),
+                donation.getPaypalOrderId(),
+                donation.getPaypalCaptureId(),
+                donation.getPayerEmail(),
                 income == null ? null : income.getId(),
                 income == null ? null : income.getCategory().getId(),
                 income == null ? null : income.getCategory().getName(),
