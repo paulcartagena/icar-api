@@ -33,15 +33,17 @@ class RateLimitFilter extends OncePerRequestFilter {
 
     private final Map<String, Bucket> buckets = new ConcurrentHashMap<>();
     private final RequestMatcher matcher;
+    private final ClientIpResolver clientIpResolver;
     private final int capacity;
     private final Duration refillPeriod;
     private final String message;
     private final HandlerExceptionResolver exceptionResolver;
 
     // Each client IP gets `capacity` requests, refilled gradually over `refillPeriod`
-    RateLimitFilter(RequestMatcher matcher, int capacity, Duration refillPeriod, String message,
-                    HandlerExceptionResolver exceptionResolver) {
+    RateLimitFilter(RequestMatcher matcher, ClientIpResolver clientIpResolver, int capacity, Duration refillPeriod,
+                    String message, HandlerExceptionResolver exceptionResolver) {
         this.matcher = matcher;
+        this.clientIpResolver = clientIpResolver;
         this.capacity = capacity;
         this.refillPeriod = refillPeriod;
         this.message = message;
@@ -60,10 +62,8 @@ class RateLimitFilter extends OncePerRequestFilter {
             buckets.values().removeIf(bucket -> bucket.getAvailableTokens() == capacity);
         }
 
-        // Behind a proxy, Tomcat already resolves the real client IP from X-Forwarded-For
-        // (server.forward-headers-strategy: native, which only trusts private-network proxies).
-        // Reading the header here would let a client skip the limit by sending a different value each time.
-        Bucket bucket = buckets.computeIfAbsent(request.getRemoteAddr(), ip -> newBucket());
+        // Never read X-Forwarded-For here: a client could skip the limit by sending a different value each time
+        Bucket bucket = buckets.computeIfAbsent(clientIpResolver.resolve(request), ip -> newBucket());
         ConsumptionProbe probe = bucket.tryConsumeAndReturnRemaining(1);
 
         if (probe.isConsumed()) {

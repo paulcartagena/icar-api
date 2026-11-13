@@ -121,6 +121,7 @@ nano ~/icar/.env
 | `ADMIN_USERNAME` / `ADMIN_PASSWORD` | las credenciales del primer admin (contraseña de 12 a 72 caracteres) |
 | `ADMIN_FULL_NAME` | opcional, el nombre que se muestra |
 | `CORS_ALLOWED_ORIGINS` | déjalo como está hasta que el panel o el sitio tengan URL de producción |
+| `TRUSTED_PROXY_SECRET` | otro valor de `openssl rand -base64 32`; el mismo va en `API_PROXY_SECRET` de icar-web (Vercel). Así el límite de formularios y donaciones cuenta a cada visitante y no al servidor de la web |
 | `API_DOCS_ENABLED` | `false`; ponlo en `true` solo mientras necesites `/scalar` (paso 7) |
 | `PAYPAL_*` | vacías hasta configurar las donaciones online (paso 9) |
 

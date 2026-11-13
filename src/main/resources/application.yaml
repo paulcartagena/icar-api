@@ -29,6 +29,11 @@ scalar:
 jwt:
   secret: ${JWT_SECRET}
 
+# Shared with the public website's server so the rate limits see each visitor's IP instead of the website's
+# (see ClientIpResolver). Empty: X-Client-IP is ignored.
+trusted-proxy:
+  secret: ${TRUSTED_PROXY_SECRET:}
+
 # Only used on startup when no ADMIN user exists yet (see InitialAdminCreator)
 admin:
   username: ${ADMIN_USERNAME:}
