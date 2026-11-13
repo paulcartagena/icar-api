@@ -59,9 +59,11 @@ lives in the Obsidian vault, not this repo.
   the user's sessions. The first ADMIN is created at startup by `InitialAdminCreator` from `ADMIN_USERNAME` /
   `ADMIN_PASSWORD` when none exists. Passwords are BCrypt, 12-72 characters. `POST /auth/login` is rate limited per
   client IP (`RateLimitFilter`, Bucket4j in memory, `auth.login-rate-limit.*`, 5 per minute by default): over
-  the limit it answers 429 (`ApiException.tooManyRequests`) with `Retry-After`. The IP is `getRemoteAddr()`, which
-  `server.forward-headers-strategy: native` resolves from `X-Forwarded-For` only for private-network proxies; never
-  read that header directly. Each `RateLimitFilter` instance (one per limited route, with its own buckets) is created
+  the limit it answers 429 (`ApiException.tooManyRequests`) with `Retry-After`. The IP comes from `ClientIpResolver`: `getRemoteAddr()`,
+  which `server.forward-headers-strategy: native` resolves from `X-Forwarded-For` only for private-network proxies
+  (never read that header directly), unless the request carries `X-Proxy-Secret` equal to `TRUSTED_PROXY_SECRET`
+  (`TrustedProxyProperties`, `trusted-proxy.secret`), in which case its `X-Client-IP` is used: the public website
+  calls the API from its server and sends each visitor's IP that way. Each `RateLimitFilter` instance (one per limited route, with its own buckets) is created
   inside `SecurityConfig`, not as a bean, so it isn't also registered as a servlet filter.
 - User rules: users are deactivated, never deleted; status is only `ACTIVE`/`INACTIVE` (`V11`). Anti-escalation:
   an actor can only manage users and assign roles below their own level unless they have `USERS_ADMIN`; nobody
@@ -167,7 +169,8 @@ changes to the compose file or Caddyfile must be copied to the server by hand.
   its `-test` companion) provides JWT validation and `JwtEncoder`/`JwtDecoder` via Nimbus.
 - Required env vars: the datasource ones per profile, `JWT_SECRET` (at least 32 characters), and `ADMIN_USERNAME` /
   `ADMIN_PASSWORD` (optional `ADMIN_FULL_NAME`) only on the first start against an empty DB. Optional:
-  `CORS_ALLOWED_ORIGINS` (comma-separated, required in production), `PORT` (default 8080), `API_DOCS_ENABLED`
+  `CORS_ALLOWED_ORIGINS` (comma-separated, required in production), `TRUSTED_PROXY_SECRET` (shared with the
+  public website's server; empty ignores `X-Client-IP`), `PORT` (default 8080), `API_DOCS_ENABLED`
   (Scalar and `/v3/api-docs`: open by default, closed in the `prod` profile unless set to `true`), and
   `PAYPAL_CLIENT_ID` / `PAYPAL_CLIENT_SECRET` / `PAYPAL_WEBHOOK_ID` / `PAYPAL_BASE_URL` (sandbox by default) for online
   donations.

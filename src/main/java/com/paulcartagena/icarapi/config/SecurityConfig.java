@@ -40,7 +40,7 @@ import java.util.List;
 @Configuration
 @EnableMethodSecurity
 @EnableConfigurationProperties({JwtProperties.class, AuthProperties.class, CorsProperties.class,
-        VisitRequestProperties.class, PayPalProperties.class})
+        VisitRequestProperties.class, PayPalProperties.class, TrustedProxyProperties.class})
 public class SecurityConfig {
 
     private static final PathPatternRequestMatcher.Builder PATHS = PathPatternRequestMatcher.withDefaults();
@@ -77,7 +77,9 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http, AuthProperties authProperties,
                                                    VisitRequestProperties visitRequestProperties,
-                                                   PayPalProperties payPalProperties) throws Exception {
+                                                   PayPalProperties payPalProperties,
+                                                   TrustedProxyProperties trustedProxyProperties) throws Exception {
+        ClientIpResolver clientIpResolver = new ClientIpResolver(trustedProxyProperties.secret());
         AuthenticationEntryPoint entryPoint = (request, response, ex) ->
                 exceptionResolver.resolveException(request, response, null, ex);
         AccessDeniedHandler accessDeniedHandler = (request, response, ex) ->
@@ -102,17 +104,17 @@ public class SecurityConfig {
                         .authenticationEntryPoint(entryPoint)
                         .accessDeniedHandler(accessDeniedHandler))
                 // Not beans on purpose: Spring Boot would also register them as servlet filters outside this chain
-                .addFilterBefore(new RateLimitFilter(LOGIN,
+                .addFilterBefore(new RateLimitFilter(LOGIN, clientIpResolver,
                                 authProperties.loginRateLimit().capacity(),
                                 authProperties.loginRateLimit().refillPeriod(),
                                 "Too many login attempts. Try again later.", exceptionResolver),
                         BearerTokenAuthenticationFilter.class)
-                .addFilterBefore(new RateLimitFilter(NEW_VISIT_REQUEST,
+                .addFilterBefore(new RateLimitFilter(NEW_VISIT_REQUEST, clientIpResolver,
                                 visitRequestProperties.rateLimit().capacity(),
                                 visitRequestProperties.rateLimit().refillPeriod(),
                                 "Too many visit requests. Try again later.", exceptionResolver),
                         BearerTokenAuthenticationFilter.class)
-                .addFilterBefore(new RateLimitFilter(NEW_PAYPAL_ORDER,
+                .addFilterBefore(new RateLimitFilter(NEW_PAYPAL_ORDER, clientIpResolver,
                                 payPalProperties.orderRateLimit().capacity(),
                                 payPalProperties.orderRateLimit().refillPeriod(),
                                 "Too many donation attempts. Try again later.", exceptionResolver),
